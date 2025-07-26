@@ -1,6 +1,7 @@
 from django.db import models
 import uuid
 from django.utils.translation import gettext_lazy as _
+from accounts.models import Doctor
 # Create your models here.
 
 # --------------------------------------------------------------------
@@ -19,6 +20,13 @@ class Patient(models.Model):
     phone = models.CharField(max_length=20, verbose_name=_("Phone"), unique=True)
     email = models.EmailField(verbose_name=_("Email"), null=True, blank=True, unique=True)
     address = models.TextField(verbose_name=_("Address"), null=True, blank=True)
+    doctor = models.ForeignKey(
+        Doctor,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='patients',
+        verbose_name=_("Treating Doctor")
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Updated At"))
     is_archived = models.BooleanField(default=False, verbose_name=_("Archived"))

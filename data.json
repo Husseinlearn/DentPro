@@ -1,0 +1,37 @@
+[
+    {
+    "first_name": "Ali",
+    "last_name": "Ahmed",
+    "date_of_birth": "1995-07-01",
+    "gender": "male",
+    "phone": "+967771234567",
+    "email": "ali@example.com",
+    "address": "Sanaa, Yemen"
+},
+{
+    "username": "reception_ali",
+    "email": "ali@clinic.com",
+    "user_type": "receptionist",
+    "password": "Secure123",
+    "password2": "Secure123",
+    "profile": {
+        "phone": "777111222",
+        "gender": "male",
+        "birth_date": "1992-05-01",
+        "address": "صنعاء، التحرير"
+    }
+},
+{
+    "username": "doctor_ali",
+    "email": "ali@gmail.com",
+    "user_type": "doctor",
+    "password": "DoctorPass123",
+    "password2": "DoctorPass123",
+    "profile": {
+        "phone": "+967771234567",
+        "gender":"male",
+        "birth_date": "1995-07-01",
+        "address": "Sanaa, Yemen"
+    }
+}
+]

@@ -6,17 +6,9 @@ class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'date_of_birth',
-            'gender',
-            'phone',
-            'email',
-            'address',
-            'created_at',
-            'updated_at',
-            'is_archived',
+            'id', 'first_name', 'last_name', 'date_of_birth', 'gender',
+            'phone', 'email', 'address', 'doctor',
+            'created_at', 'updated_at', 'is_archived',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

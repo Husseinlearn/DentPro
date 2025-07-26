@@ -3,6 +3,7 @@ from .models import Patient
 from accounts.models import Doctor
 from django.contrib.auth import get_user_model
 import re
+from datetime import date
 
 User = get_user_model()
 class PatientSerializer(serializers.ModelSerializer):
@@ -19,33 +20,49 @@ class PatientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'doctor']
 
+    #  تعيين الطبيب من خلال الاسم
     def _assign_doctor_by_name(self, validated_data):
         doctor_name = validated_data.pop('doctor_name', None)
         if not doctor_name:
             return
-
         try:
             first_name, last_name = doctor_name.strip().split(" ", 1)
             user = User.objects.get(first_name__iexact=first_name, last_name__iexact=last_name)
             doctor = Doctor.objects.get(user=user)
             validated_data['doctor'] = doctor
         except ValueError:
-            raise serializers.ValidationError({'doctor_name': "Doctor name must include first and last name seeeparated by a space."})
+            raise serializers.ValidationError({'doctor_name': "Doctor name must include first and last name separated by a space."})
         except User.DoesNotExist:
             raise serializers.ValidationError({'doctor_name': f"No user found with name '{doctor_name}'."})
         except Doctor.DoesNotExist:
             raise serializers.ValidationError({'doctor_name': f"No doctor found for user '{doctor_name}'."})
 
+    #  تحقق من الاسم الأول
     def validate_first_name(self, value):
-        if value.isdigit():
-            raise serializers.ValidationError("First name cannot be only numbers.")
+        if not value.strip().isalpha():
+            raise serializers.ValidationError("First name must contain only letters.")
         return value
 
+    #  تحقق من الاسم الأخير
     def validate_last_name(self, value):
-        if value.isdigit():
-            raise serializers.ValidationError("Last name cannot be only numbers.")
+        if not value.strip().isalpha():
+            raise serializers.ValidationError("Last name must contain only letters.")
         return value
 
+    #  تحقق من تاريخ الميلاد
+    def validate_date_of_birth(self, value):
+        if value > date.today():
+            raise serializers.ValidationError("Date of birth cannot be in the future.")
+        return value
+
+    #  تحقق من الجنس
+    def validate_gender(self, value):
+        allowed = ['Male', 'Female', 'Other']
+        if value not in allowed:
+            raise serializers.ValidationError(f"Gender must be one of: {', '.join(allowed)}.")
+        return value
+
+    #  تحقق من الهاتف
     def validate_phone(self, value):
         if not re.match(r'^\+?\d{7,15}$', value):
             raise serializers.ValidationError("Phone number must contain only digits and may start with '+'.")
@@ -53,15 +70,24 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Phone number already exists.")
         return value
 
+    #  تحقق من البريد الإلكتروني
     def validate_email(self, value):
         if value and Patient.objects.filter(email=value).exclude(id=self.instance.id if self.instance else None).exists():
             raise serializers.ValidationError("Email already exists.")
         return value
 
+    #  تحقق من العنوان
+    def validate_address(self, value):
+        if len(value.strip()) < 5:
+            raise serializers.ValidationError("Address is too short.")
+        return value
+
+    # إنشاء مريض
     def create(self, validated_data):
         self._assign_doctor_by_name(validated_data)
         return super().create(validated_data)
 
+    # تعديل بيانات مريض
     def update(self, instance, validated_data):
         self._assign_doctor_by_name(validated_data)
         return super().update(instance, validated_data)

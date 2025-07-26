@@ -4,9 +4,10 @@ from accounts.models import Doctor
 from django.contrib.auth import get_user_model
 import re
 
+User = get_user_model()
 class PatientSerializer(serializers.ModelSerializer):
-    doctor_name = serializers.CharField(write_only=True, required=False)  # اسم الطبيب كإدخال
-    doctor_display = serializers.CharField(source='doctor.full_name', read_only=True)  # لعرض اسم الطبيب بدل ID
+    doctor_name = serializers.CharField(write_only=True, required=False)
+    doctor_display = serializers.CharField(source='doctor.user.get_full_name', read_only=True)
 
     class Meta:
         model = Patient
@@ -17,6 +18,23 @@ class PatientSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'is_archived',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'doctor']
+
+    def _assign_doctor_by_name(self, validated_data):
+        doctor_name = validated_data.pop('doctor_name', None)
+        if not doctor_name:
+            return
+
+        try:
+            first_name, last_name = doctor_name.strip().split(" ", 1)
+            user = User.objects.get(first_name__iexact=first_name, last_name__iexact=last_name)
+            doctor = Doctor.objects.get(user=user)
+            validated_data['doctor'] = doctor
+        except ValueError:
+            raise serializers.ValidationError({'doctor_name': "Doctor name must include first and last name seeeparated by a space."})
+        except User.DoesNotExist:
+            raise serializers.ValidationError({'doctor_name': f"No user found with name '{doctor_name}'."})
+        except Doctor.DoesNotExist:
+            raise serializers.ValidationError({'doctor_name': f"No doctor found for user '{doctor_name}'."})
 
     def validate_first_name(self, value):
         if value.isdigit():
@@ -41,32 +59,9 @@ class PatientSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        User = get_user_model()
-        doctor_name = validated_data.pop('doctor_name', None)
-        if doctor_name:
-            try:
-                # نحاول فصل الاسم إلى اسم أول واسم أخير
-                first_name, last_name = doctor_name.strip().split(" ", 1)
-                # البحث عن المستخدم
-                user = User.objects.get(first_name__iexact=first_name, last_name__iexact=last_name)
-                # البحث عن الطبيب المرتبط بهذا المستخدم
-                doctor = Doctor.objects.get(user=user)
-                validated_data['doctor'] = doctor
-            except ValueError:
-                raise serializers.ValidationError({'doctor_name': "Doctor name must include first and last name separated by a space."})
-            except User.DoesNotExist:
-                raise serializers.ValidationError({'doctor_name': f"No user found with name '{doctor_name}'."})
-            except Doctor.DoesNotExist:
-                raise serializers.ValidationError({'doctor_name': f"No doctor found for user '{doctor_name}'."})
-
+        self._assign_doctor_by_name(validated_data)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        doctor_name = validated_data.pop('doctor_name', None)
-        if doctor_name:
-            try:
-                doctor = Doctor.objects.get(full_name__iexact=doctor_name)
-                validated_data['doctor'] = doctor
-            except Doctor.DoesNotExist:
-                raise serializers.ValidationError({'doctor_name': f"Doctor '{doctor_name}' not found."})
+        self._assign_doctor_by_name(validated_data)
         return super().update(instance, validated_data)

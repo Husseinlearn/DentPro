@@ -1,93 +1,85 @@
 from rest_framework import serializers
 from .models import Patient
-from accounts.models import Doctor
-from django.contrib.auth import get_user_model
+
 import re
 from datetime import date
 
-User = get_user_model()
-class PatientSerializer(serializers.ModelSerializer):
-    doctor_name = serializers.CharField(write_only=True, required=False)
-    doctor_display = serializers.CharField(source='doctor.user.get_full_name', read_only=True)
 
+class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = [
-            'id', 'first_name', 'last_name', 'date_of_birth', 'gender',
-            'phone', 'email', 'address',
-            'doctor', 'doctor_name', 'doctor_display',
-            'created_at', 'updated_at', 'is_archived',
+            'id',
+            'first_name',
+            'last_name',
+            'date_of_birth',
+            'gender',
+            'phone',
+            'email',
+            'address',
+            'created_at',
+            'updated_at',
+            'is_archived',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'doctor']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
-    #  تعيين الطبيب من خلال الاسم
-    def _assign_doctor_by_name(self, validated_data):
-        doctor_name = validated_data.pop('doctor_name', None)
-        if not doctor_name:
-            return
-        try:
-            first_name, last_name = doctor_name.strip().split(" ", 1)
-            user = User.objects.get(first_name__iexact=first_name, last_name__iexact=last_name)
-            doctor = Doctor.objects.get(user=user)
-            validated_data['doctor'] = doctor
-        except ValueError:
-            raise serializers.ValidationError({'doctor_name': "Doctor name must include first and last name separated by a space."})
-        except User.DoesNotExist:
-            raise serializers.ValidationError({'doctor_name': f"No user found with name '{doctor_name}'."})
-        except Doctor.DoesNotExist:
-            raise serializers.ValidationError({'doctor_name': f"No doctor found for user '{doctor_name}'."})
-
-    #  تحقق من الاسم الأول
+    #  التحقق من الاسم الأول
     def validate_first_name(self, value):
         if not value.strip().isalpha():
             raise serializers.ValidationError("First name must contain only letters.")
         return value
 
-    #  تحقق من الاسم الأخير
+    #  التحقق من الاسم الأخير
     def validate_last_name(self, value):
         if not value.strip().isalpha():
             raise serializers.ValidationError("Last name must contain only letters.")
         return value
 
-    #  تحقق من تاريخ الميلاد
+    #  التحقق من تاريخ الميلاد
     def validate_date_of_birth(self, value):
         if value > date.today():
             raise serializers.ValidationError("Date of birth cannot be in the future.")
         return value
 
-    #  تحقق من الجنس
+    #  التحقق من الجنس
     def validate_gender(self, value):
         allowed = ['Male', 'Female', 'Other']
         if value not in allowed:
             raise serializers.ValidationError(f"Gender must be one of: {', '.join(allowed)}.")
         return value
 
-    #  تحقق من الهاتف
+    #  التحقق من رقم الهاتف
     def validate_phone(self, value):
         if not re.match(r'^\+?\d{7,15}$', value):
             raise serializers.ValidationError("Phone number must contain only digits and may start with '+'.")
         if Patient.objects.filter(phone=value).exclude(id=self.instance.id if self.instance else None).exists():
             raise serializers.ValidationError("Phone number already exists.")
         return value
-
-    #  تحقق من البريد الإلكتروني
+    def validate_gender(self, value):
+        allowed = ['male', 'female', 'other']
+        normalized = value.strip().lower()
+        if normalized not in allowed:
+            raise serializers.ValidationError(f"Gender must be one of: {', '.join(allowed)}.")
+        return normalized
+    #  التحقق من البريد الإلكتروني
     def validate_email(self, value):
         if value and Patient.objects.filter(email=value).exclude(id=self.instance.id if self.instance else None).exists():
             raise serializers.ValidationError("Email already exists.")
         return value
 
-    #  تحقق من العنوان
+    #  التحقق من العنوان
     def validate_address(self, value):
         if len(value.strip()) < 5:
             raise serializers.ValidationError("Address is too short.")
         return value
 
-    # إنشاء مريض
+    #  دالة الإنشاء
     def create(self, validated_data):
-        self._assign_doctor_by_name(validated_data)
-        return super().create(validated_data)
+        return Patient.objects.create(**validated_data)
 
-    # تعديل بيانات مريض
+    #  دالة التعديل
     def update(self, instance, validated_data):
-        self._assign_doctor_by_name(validated_data)
-        return super().update(instance, validated_data)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance

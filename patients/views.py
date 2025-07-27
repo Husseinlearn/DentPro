@@ -3,7 +3,7 @@ from django.shortcuts import render
 # Create your views here.
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics
+from rest_framework import status, generics, filters
 from .models import Patient
 from .serializers import PatientSerializer
 from django.shortcuts import get_object_or_404
@@ -15,8 +15,14 @@ class PatientListCreateAPIView(generics.ListCreateAPIView):
     """عرض وإنشاء المرضى"""
     queryset = Patient.objects.filter(is_archived=False)
     serializer_class = PatientSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PatientFilter
+    #  البحث في هذه الحقول
+    search_fields = ['first_name', 'last_name', 'phone', 'email', 'address']
+
+    #  السماح بالترتيب حسب هذه الحقول
+    ordering_fields = ['first_name', 'last_name', 'date_of_birth', 'created_at']
+    ordering = ['created_at']  # ترتيب افتراضي
     # def get(self, request):
     #     patients = Patient.objects.filter(is_archived=False)
     #     serializer = PatientSerializer(patients, many=True)
@@ -51,6 +57,5 @@ class PatientRetrieveUpdateDestroyAPIView(APIView):
 
     def delete(self, request, pk):
         patient = self.get_object(pk)
-        patient.is_archived = True
-        patient.save()
-        return Response({'message': 'Patient archived successfully'}, status=status.HTTP_204_NO_CONTENT)
+        patient.delete()  # This will set is_archived to True
+        return Response({'message': 'Patient Deleted successfully'},status=status.HTTP_204_NO_CONTENT)

@@ -48,12 +48,14 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Gender must be one of: {', '.join(allowed)}.")
         return value
 
-    #  التحقق من رقم الهاتف
     def validate_phone(self, value):
-        if not re.match(r'^\+?\d{7,15}$', value):
-            raise serializers.ValidationError("Phone number must contain only digits and may start with '+'.")
+        if not re.match(r'^0?7\d{8}$', value):
+            raise serializers.ValidationError("Phone number must be a valid Yemeni number (e.g. +9677XXXXXXXX or 07XXXXXXXX).")
+
+        # تحقق من عدم التكرار
         if Patient.objects.filter(phone=value).exclude(id=self.instance.id if self.instance else None).exists():
             raise serializers.ValidationError("Phone number already exists.")
+
         return value
     def validate_gender(self, value):
         allowed = ['male', 'female', 'other']

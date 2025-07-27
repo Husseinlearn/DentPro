@@ -3,6 +3,6 @@ from . import views
 
 
 urlpatterns = [
-    path('api/patient/', views.PatientListCreateAPIView.as_view(), name='patient-list-create'),
-    path('api/patient/<uuid:pk>/', views.PatientRetrieveUpdateDestroyAPIView.as_view(), name='patient-retrieve-update-destroy'),
+    path('patient/', views.PatientListCreateAPIView.as_view(), name='patient-list-create'),
+    path('patient/<uuid:pk>/', views.PatientRetrieveUpdateDestroyAPIView.as_view(), name='patient-retrieve-update-destroy'),
 ]

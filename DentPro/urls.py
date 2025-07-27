@@ -20,7 +20,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('accounts/', include('accounts.urls')),  # Include URLs from the accounts app
-    path('patients/', include('patients.urls')),  # Include URLs from the patients app
+    path('api/accounts/', include('accounts.urls')),  # Include URLs from the accounts app
+    path('api/patients/', include('patients.urls')),  # Include URLs from the patients app
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # JWT token endpoint
 ]

@@ -4,8 +4,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .serializers import UnifiedUserSerializer 
 from rest_framework import status
+
 # Create your views here.
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def register_user(request):
     serializer = UnifiedUserSerializer(data=request.data)
     if serializer.is_valid():

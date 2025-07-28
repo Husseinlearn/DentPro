@@ -20,7 +20,7 @@ class PatientListCreateAPIView(generics.ListCreateAPIView):
     #  البحث في هذه الحقول
     search_fields = ['first_name', 'last_name', 'phone', 'email', 'address']
 
-    #  السماح بالترتيب حسب هذه الحقول
+    #  السماح بالترتيب حسب الحقول التالية 
     ordering_fields = ['first_name', 'last_name', 'date_of_birth', 'created_at']
     ordering = ['created_at']  # ترتيب افتراضي
     # def get(self, request):

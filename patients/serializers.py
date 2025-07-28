@@ -23,18 +23,24 @@ class PatientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+    def validate(self, data):
+        full_name = f"{data.get('first_name', '').strip()} {data.get('last_name', '').strip()}"
+        parts = full_name.split()
+        if len(parts) < 4:
+            raise serializers.ValidationError("Full name must contain at least four words (first and last name combined).")
+        return data
 
-    #  التحقق من الاسم الأول
-    def validate_first_name(self, value):
-        if not value.strip().isalpha():
-            raise serializers.ValidationError("First name must contain only letters.")
-        return value
+    # #  التحقق من الاسم الأول
+    # def validate_first_name(self, value):
+    #     if not value.strip().isalpha():
+    #         raise serializers.ValidationError("First name must contain only letters.")
+    #     return value
 
-    #  التحقق من الاسم الأخير
-    def validate_last_name(self, value):
-        if not value.strip().isalpha():
-            raise serializers.ValidationError("Last name must contain only letters.")
-        return value
+    # #  التحقق من الاسم الأخير
+    # def validate_last_name(self, value):
+    #     if not value.strip().isalpha():
+    #         raise serializers.ValidationError("Last name must contain only letters.")
+    #     return value
 
     #  التحقق من تاريخ الميلاد
     def validate_date_of_birth(self, value):

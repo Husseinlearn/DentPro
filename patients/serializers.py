@@ -23,6 +23,7 @@ class PatientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+
     #  التحقق من الاسم الأول
     def validate_first_name(self, value):
         if not value.strip().isalpha():
@@ -43,11 +44,14 @@ class PatientSerializer(serializers.ModelSerializer):
 
     #  التحقق من الجنس
     def validate_gender(self, value):
-        allowed = ['Male', 'Female', 'Other']
-        if value not in allowed:
-            raise serializers.ValidationError(f"Gender must be one of: {', '.join(allowed)}.")
-        return value
-
+        val = value.strip().lower()
+        accepted = ['male', 'female', 'other', 'ذكر', 'أنثى', 'انثى', 'غير ذلك', 'اخر', 'آخر']
+        if val not in accepted:
+            raise serializers.ValidationError(
+                "Gender must be one of: ذكر، أنثى، غير ذلك أو male, female, other."
+            )
+        return value.strip()
+    #  التحقق من رقم الهاتف
     def validate_phone(self, value):
         if not re.match(r'^0?7\d{8}$', value):
             raise serializers.ValidationError("Phone number must be a valid Yemeni number (e.g. +9677XXXXXXXX or 07XXXXXXXX).")
@@ -57,12 +61,7 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Phone number already exists.")
 
         return value
-    def validate_gender(self, value):
-        allowed = ['male', 'female', 'other']
-        normalized = value.strip().lower()
-        if normalized not in allowed:
-            raise serializers.ValidationError(f"Gender must be one of: {', '.join(allowed)}.")
-        return normalized
+    
     #  التحقق من البريد الإلكتروني
     def validate_email(self, value):
         if value and Patient.objects.filter(email=value).exclude(id=self.instance.id if self.instance else None).exists():

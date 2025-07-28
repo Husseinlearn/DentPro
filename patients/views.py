@@ -27,7 +27,7 @@ class PatientListCreateAPIView(generics.ListCreateAPIView):
     #     patients = Patient.objects.filter(is_archived=False)
     #     serializer = PatientSerializer(patients, many=True)
     #     return Response(serializer.data, status=status.HTTP_200_OK)
-    permission_classes = [IsAuthenticated]  # تأكد من أن المستخدم مسجل دخوله
+    # permission_classes = [IsAuthenticated]  # تأكد من أن المستخدم مسجل دخوله
     def post(self, request):
         serializer = PatientSerializer(data=request.data)
         if serializer.is_valid():

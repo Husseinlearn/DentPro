@@ -12,7 +12,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 # from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 # Create your views here.
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 def register_user(request):
     serializer = UnifiedUserSerializer(data=request.data)
     if serializer.is_valid():

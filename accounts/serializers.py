@@ -12,6 +12,14 @@ class UserProfileNestedSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ['phone', 'gender', 'birth_date', 'address', 'image']
+    
+    def validate_gender(self, value):
+        allowed = ['ذكر', 'أنثى', 'male', 'female']
+        if value.strip().lower() not in [v.lower() for v in allowed]:
+            raise serializers.ValidationError(
+                "الجنس يجب أن يكون أحد القيم التالية فقط: 'ذكر', 'أنثى', 'male', 'female'."
+            )
+        return value.strip()
 
 
 class DoctorNestedSerializer(serializers.ModelSerializer):
@@ -57,6 +65,16 @@ class UnifiedUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"doctor_profile": "Doctor data is required for user_type 'doctor'"})
         return attrs
 
+    def validate(self, data):
+        # اجمع الاسم الأول والأخير بعد إزالة الفراغات من الطرفين
+        full_name = f"{data.get('first_name', '').strip()} {data.get('last_name', '').strip()}"
+        words = full_name.split()
+
+        # تحقق من أن الاسم يتكون من 4 كلمات على الأقل
+        if len(words) < 4:
+            raise serializers.ValidationError("الاسم الكامل يجب أن يتكون من أربع كلمات على الأقل (الاسم الأول + الاسم الأخير).")
+
+        return data
     def create(self, validated_data):
         profile_data = validated_data.pop('profile')
         doctor_data = validated_data.pop('doctor_profile', None)

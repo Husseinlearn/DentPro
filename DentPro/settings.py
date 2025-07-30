@@ -25,12 +25,14 @@ SECRET_KEY = 'django-insecure-wid_wg*+6p$4mo5q(#^(-^4a4ni0mvro!)#(a%@bwk-_j73sw5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',  # CORS headers
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',
     'rest_framework',  # Django REST Framework for API development
-    'rest_framework_simplejwt',  # JWT authentication
+    'rest_framework_simplejwt',
     'accounts',  # Custom app for user accounts
     'patients',  # Custom app for patient management
 ]
@@ -47,13 +49,21 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:9498",
+    "http://192.168.0.188:9498",  # React app running on localhost
 ]
 
 ROOT_URLCONF = 'DentPro.urls'
@@ -82,10 +92,10 @@ WSGI_APPLICATION = 'DentPro.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',  # Use 'django.db.backends.sqlite3' for SQLite
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'dentpro',  # Name of your database
         'USER': 'postgres',  # Your database user
-        'PASSWORD': '123456',  # Your database password
+        'PASSWORD': 'Ibrahem2344',  # Your database password
         'HOST': 'localhost',  # Database host
         'PORT': '5432',  # Database port, default for PostgreSQL
     }

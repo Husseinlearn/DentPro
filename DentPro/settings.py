@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',  # Token authentication
     'accounts',  # Custom app for user accounts
     'patients',  # Custom app for patient management
+    'appointment',  # Custom app for appointment management
 ]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'

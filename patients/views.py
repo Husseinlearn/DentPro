@@ -23,10 +23,7 @@ class PatientListCreateAPIView(generics.ListCreateAPIView):
     #  السماح بالترتيب حسب الحقول التالية 
     ordering_fields = ['first_name', 'last_name', 'date_of_birth', 'created_at']
     ordering = ['created_at']  # ترتيب افتراضي
-    # def get(self, request):
-    #     patients = Patient.objects.filter(is_archived=False)
-    #     serializer = PatientSerializer(patients, many=True)
-    #     return Response(serializer.data, status=status.HTTP_200_OK)
+    
     # permission_classes = [IsAuthenticated]  # تأكد من أن المستخدم مسجل دخوله
     def post(self, request):
         serializer = PatientSerializer(data=request.data)

@@ -12,8 +12,8 @@
     "username": "reception_ali",
     "email": "ali@clinic.com",
     "user_type": "receptionist",
-    "password": "Secure123",
-    "password2": "Secure123",
+    "password": "#",
+    "password2": "#",
     "profile": {
         "phone": "777111222",
         "gender": "male",
@@ -25,8 +25,8 @@
     "username": "doctor_ali",
     "email": "ali@gmail.com",
     "user_type": "doctor",
-    "password": "DoctorPass123",
-    "password2": "DoctorPass123",
+    "password": "#",
+    "password2": "#",
     "profile": {
         "phone": "+967771234567",
         "gender":"male",

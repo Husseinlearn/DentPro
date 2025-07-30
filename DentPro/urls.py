@@ -22,5 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/accounts/', include('accounts.urls')),  # Include URLs from the accounts app
     path('api/patients/', include('patients.urls')),  # Include URLs from the patients app
+    path('api/appointment/', include('appointment.urls')),  # Include URLs from the appointment app
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # JWT token endpoint
 ]

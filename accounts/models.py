@@ -72,16 +72,16 @@ class UserRole(models.Model):
 # UserProfile: معلومات إضافية للمستخدم
 # --------------------------------------------------------------------
 class UserProfile(models.Model):
-    class GenderChoices(models.TextChoices):
-        MALE = 'male', _('Male')
-        FEMALE = 'female', _('Female')
+    # class GenderChoices(models.TextChoices):
+    #     MALE = 'male', _('Male')
+    #     FEMALE = 'female', _('Female')
+    #     # choices=GenderChoices.choices,
+    #     # default=GenderChoices.MALE,
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
     phone = models.CharField(max_length=15, blank=True, null=True)
     gender = models.CharField(
         max_length=10,
-        choices=GenderChoices.choices,
-        default=GenderChoices.MALE,
         blank=True,
         null=True
     )

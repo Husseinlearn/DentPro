@@ -7,16 +7,25 @@ from accounts.models import Doctor
 # --------------------------------------------------------------------
 # Patient Model: جدول  المرضى 
 class Patient(models.Model):
-    GENDER_CHOICES = [
-        ('male', _('Male')),
-        ('female', _('Female')),
-    ]
+    # GENDER_CHOICES = [
+    #     ('male', _('ذكر')),
+    #     ('female', _('انثى')),
+    # ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     first_name = models.CharField(max_length=100, verbose_name=_("First Name"))
     last_name = models.CharField(max_length=100, verbose_name=_("Last Name"))
     date_of_birth = models.DateField(verbose_name=_("Date of Birth"), null=True, blank=True)
-    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, verbose_name=_("Gender"), null=True, blank=True)
+    gender = models.CharField(max_length=10,
+    choices=[
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('انثى', 'أنثى'), 
+        ('ذكر', 'ذكر'), 
+        ('غير ذلك', 'غير ذلك')
+        ],
+        null=True, blank=True)
     phone = models.CharField(max_length=20, verbose_name=_("Phone"), unique=True)
     email = models.EmailField(verbose_name=_("Email"), null=True, blank=True, unique=True)
     address = models.TextField(verbose_name=_("Address"), null=True, blank=True)

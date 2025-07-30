@@ -9,7 +9,7 @@ from django.contrib.auth.admin import UserAdmin
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
-    list_display = ('email', 'username', 'user_type', 'is_staff', 'is_superuser', 'is_archived')
+    list_display = ('first_name', 'username', 'user_type', 'is_staff', 'is_superuser', 'is_archived')
     search_fields = ('email', 'username')
     list_filter = ('user_type', 'is_staff', 'is_superuser', 'is_archived')
     ordering = ('email',)
@@ -26,8 +26,15 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Doctor)
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ('user', 'specialization', 'license_number')
+    list_select_related = ('user',)  # ربط بيانات user لتقليل عدد الاستعلامات
+    list_display = ('get_full_name', 'id', 'specialization', 'license_number')
     search_fields = ('user__email', 'specialization', 'license_number')
+
+    def get_full_name(self, obj):
+        return obj.user.get_full_name()
+
+    get_full_name.short_description = "الاسم الكامل"
+    get_full_name.admin_order_field = 'user__first_name'  # لجعل العمود قابل للفرز
 
 
 @admin.register(Role)

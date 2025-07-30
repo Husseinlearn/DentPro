@@ -5,7 +5,9 @@ from rest_framework.response import Response
 from .serializers import UnifiedUserSerializer 
 from rest_framework import status
 from django.contrib.auth import authenticate, login
-from .models import CustomUser
+from .models import CustomUser, Doctor
+from rest_framework.views import APIView
+from rest_framework import generics
 from rest_framework.permissions import IsAdminUser
 from rest_framework_simplejwt.tokens import AccessToken
 # from rest_framework_simplejwt.tokens import RefreshToken
@@ -96,6 +98,23 @@ def list_users(request):
     users = CustomUser.objects.all()
     serializer = UnifiedUserSerializer(users, many=True)
     return Response(serializer.data)
+
+
+
+class DoctorListSimpleAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        doctors = Doctor.objects.all()
+        data = [
+            {
+                "id": str(doctor.id),
+                "name": doctor.user.get_full_name(),
+                "email": doctor.user.email
+            }
+            for doctor in doctors
+        ]
+        return Response(data)
 
 # @api_view(['POST'])
 # @permission_classes([IsAuthenticated])

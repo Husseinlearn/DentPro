@@ -1,7 +1,6 @@
 from django.shortcuts import render
 
 # Create your views here.
-# appointments/views.py
 
 from rest_framework import generics, permissions
 from .models import Appointment
@@ -16,4 +15,10 @@ class AppointmentCreateAPIView(generics.CreateAPIView):
 class AppointmentListAPIView(generics.ListAPIView):
     queryset = Appointment.objects.all().order_by('-date', '-time')
     serializer_class = AppointmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
+
+class AppointmentUpdateAPIView(generics.RetrieveUpdateAPIView):
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentSerializer
+    # permission_classes = [permissions.IsAuthenticated]  
+    lookup_field = 'id'  

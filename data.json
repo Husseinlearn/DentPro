@@ -33,5 +33,14 @@
         "birth_date": "1995-07-01",
         "address": "Sanaa, Yemen"
     }
+},
+{
+    "first_name": "ameer ahmed abdo",
+    "last_name": "ali",
+    "date_of_birth": "1990-08-15",
+    "gender": "ذكر",
+    "phone": "778894444",
+    "email": "ameer@example.com",
+    "address": "Sanaa, Ibb"
 }
 ]

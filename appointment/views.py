@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, permissions
 from .models import Appointment
 from .serializers import AppointmentSerializer
-
+from datetime import date
 class AppointmentCreateAPIView(generics.CreateAPIView):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
@@ -24,3 +24,10 @@ class AppointmentUpdateAPIView(generics.RetrieveUpdateAPIView):
     serializer_class = AppointmentSerializer
     # permission_classes = [permissions.IsAuthenticated]  
     lookup_field = 'id'  
+
+class TodayAppointmentsAPIView(generics.ListAPIView):
+    serializer_class = AppointmentSerializer
+
+    def get_queryset(self):
+        today = date.today()
+        return Appointment.objects.filter(date=today).order_by('time')

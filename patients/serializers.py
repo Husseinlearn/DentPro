@@ -1,11 +1,22 @@
 from rest_framework import serializers
 from .models import Patient
-
+from datetime import datetime
 import re
 from datetime import date
 
-
+class FlexibleDateField(serializers.DateField):
+    def to_internal_value(self, value):
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+                try:
+                    return datetime.strptime(value, fmt).date()
+                except ValueError:
+                    continue
+        raise serializers.ValidationError("Date has wrong format. Use YYYY-MM-DD or DD-MM-YYYY.")
 class PatientSerializer(serializers.ModelSerializer):
+    date_of_birth = FlexibleDateField()
     class Meta:
         model = Patient
         fields = [
@@ -42,11 +53,30 @@ class PatientSerializer(serializers.ModelSerializer):
     #         raise serializers.ValidationError("Last name must contain only letters.")
     #     return value
 
-    #  التحقق من تاريخ الميلاد
-    def validate_date_of_birth(self, value):
-        if value > date.today():
-            raise serializers.ValidationError("Date of birth cannot be in the future.")
-        return value
+    # ✅ التحقق من تنسيق وتاريخ الميلاد
+def validate_date_of_birth(self, value):
+    from datetime import datetime, date
+
+    # إذا كانت القيمة نصية (string) نحللها
+    if isinstance(value, str):
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                value = datetime.strptime(value, fmt).date()
+                break
+            except ValueError:
+                continue
+        else:
+            raise serializers.ValidationError("Invalid date format. Use YYYY-MM-DD or DD-MM-YYYY.")
+
+    # إذا كانت القيمة كائن datetime نحولها إلى date فقط
+    elif isinstance(value, datetime):
+        value = value.date()
+
+    # تحقق أن التاريخ ليس في المستقبل
+    if value > date.today():
+        raise serializers.ValidationError("Date of birth cannot be in the future.")
+
+    return value
 
     #  التحقق من الجنس
     def validate_gender(self, value):

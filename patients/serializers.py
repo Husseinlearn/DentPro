@@ -76,7 +76,7 @@ class PatientSerializer(serializers.ModelSerializer):
 
     #  التحقق من العنوان
     def validate_address(self, value):
-        if len(value.strip()) < 5:
+        if len(value.strip()) < 2:
             raise serializers.ValidationError("Address is too short.")
         return value
 

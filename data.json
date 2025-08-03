@@ -42,5 +42,25 @@
     "phone": "778894444",
     "email": "ameer@example.com",
     "address": "Sanaa, Ibb"
+},
+{
+    "username": "dr_morad",
+    "email": "morad@example.com",
+    "first_name":"morad",
+    "last_name":"ali",
+    "user_type": "doctor",
+    "password": "Secure123",
+    "password2": "Secure123",
+    "profile": {
+    "phone": "778888888",
+    "gender": "female",
+    "birth_date": "1982-02-02",
+    "address": "المنصورة، عدن"
+    },
+    "doctor_profile": {
+    "specialization": "طب الأسنان التجميلي",
+    "license_number": "DOC-2003-002",
+    "revenue_share": 28.0
+    }
 }
 ]

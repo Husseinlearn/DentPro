@@ -98,11 +98,11 @@ WSGI_APPLICATION = 'DentPro.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),  # Database port, default for PostgreSQL
+        'NAME': 'dentpro',  # Name of your database
+        'USER': 'postgres',  # Your database user
+        'PASSWORD': 'Ibrahem2344',  # Your database password
+        'HOST': 'localhost',  # Database host
+        'PORT': '5432',  # Database port, default for PostgreSQL# Database port, default for PostgreSQL
     }
 }
 

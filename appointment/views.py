@@ -24,6 +24,11 @@ class AppointmentUpdateAPIView(generics.RetrieveUpdateAPIView):
     # permission_classes = [permissions.IsAuthenticated]  
     lookup_field = 'id'  
 
+class AppointmentDetailAPIView(generics.RetrieveAPIView):
+    queryset = Appointment.objects.select_related('patient', 'doctor__user').all()
+    serializer_class = AppointmentSerializer
+    lookup_field = 'id'  # تأكد أن id هو UUID أو Int حسب الموديل
+
 class TodayAppointmentsAPIView(generics.ListAPIView):
     serializer_class = AppointmentSerializer
 

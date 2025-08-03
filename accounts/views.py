@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializers import UnifiedUserSerializer 
+from .serializers import UnifiedUserSerializer , DoctorProfileSerializer
 from rest_framework import status
 from django.contrib.auth import authenticate, login
 from .models import CustomUser, Doctor
@@ -116,6 +116,10 @@ class DoctorListSimpleAPIView(generics.ListAPIView):
         ]
         return Response(data)
 
+class DoctorDetailAPIView(generics.RetrieveAPIView):
+    queryset = Doctor.objects.select_related('user', 'user__profile').all()
+    serializer_class = DoctorProfileSerializer
+    lookup_field = 'id'
 # @api_view(['POST'])
 # @permission_classes([IsAuthenticated])
 # def logout_user(request):

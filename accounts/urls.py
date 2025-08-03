@@ -9,5 +9,6 @@ urlpatterns = [
     path('current_user/', views.current_user, name='current_user'),
     path('list_users/', views.list_users, name='list_users'),
     path('doctor_list/', views.DoctorListSimpleAPIView.as_view(), name='doctor_list'),
+    path('doctors/<uuid:id>/', views.DoctorDetailAPIView.as_view(), name='doctor-detail'),
     # path('logout_user/', views.logout_user, name='logout_user'),
 ]

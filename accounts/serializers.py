@@ -117,3 +117,28 @@ class UnifiedUserSerializer(serializers.ModelSerializer):
             doctor.save()
 
         return instance
+    
+class DoctorProfileSerializer(serializers.ModelSerializer):
+    """لعرض بيانات الطبيب + المستخدم + البروفايل"""
+    profile = UserProfileNestedSerializer(source='user.profile')
+    
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    username = serializers.CharField(source='user.username')
+    user_type = serializers.CharField(source='user.user_type')
+
+    class Meta:
+        model = Doctor
+        fields = [
+            'id',
+            'specialization',
+            'license_number',
+            'revenue_share',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'user_type',
+            'profile'
+        ]

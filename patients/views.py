@@ -55,3 +55,8 @@ class PatientRetrieveUpdateDestroyAPIView(APIView):
         patient = self.get_object(pk)
         patient.delete()  # This will set is_archived to True
         return Response({'message': 'Patient Deleted successfully'},status=status.HTTP_204_NO_CONTENT)
+
+class PatientDetailAPIView(generics.RetrieveAPIView):
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+    lookup_field = 'id'

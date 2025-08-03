@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from decouple import config  # For environment variable management
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,12 +42,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',
     'rest_framework',  # Django REST Framework for API development
-    'rest_framework_simplejwt',
     'rest_framework_simplejwt',  # JWT authentication
     'rest_framework_simplejwt.token_blacklist',  # Token authentication
     'accounts',  # Custom app for user accounts
     'patients',  # Custom app for patient management
     'appointment',  # Custom app for appointment management
+    'procedures',  # Custom app for procedures management
 ]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
@@ -67,6 +68,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:9498",
     "http://192.168.0.188:9498",  # React app running on localhost
+    "http://127.0.0.1:8000",  # Django app running on localhost
 ]
 
 ROOT_URLCONF = 'DentPro.urls'
@@ -96,11 +98,11 @@ WSGI_APPLICATION = 'DentPro.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'dentpro',  # Name of your database
-        'USER': 'postgres',  # Your database user
-        'PASSWORD': 'Ibrahem2344',  # Your database password
-        'HOST': 'localhost',  # Database host
-        'PORT': '5432',  # Database port, default for PostgreSQL
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),  # Database port, default for PostgreSQL
     }
 }
 

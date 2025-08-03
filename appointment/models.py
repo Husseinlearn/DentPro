@@ -1,15 +1,10 @@
 from django.db import models
-
-# Create your models here.
-# appointments/models.py
-
-
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from accounts.models import CustomUser
 from patients.models import Patient
 from accounts.models import Doctor
-
+# Create your models here.
 class Appointment(models.Model):
     STATUS_CHOICES = [
         ('pending', 'pending'),

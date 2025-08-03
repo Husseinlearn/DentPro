@@ -1,11 +1,9 @@
 # from django.contrib import admin
-
-# Register your models here.
 from django.contrib import admin
 from .models import CustomUser, UserProfile, Doctor, Role, UserRole
 from django.contrib.auth.admin import UserAdmin
 
-
+# Register your models here.
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     model = CustomUser

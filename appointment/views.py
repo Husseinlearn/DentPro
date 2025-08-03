@@ -1,11 +1,10 @@
 from django.shortcuts import render
 from django_filters.rest_framework import DjangoFilterBackend
-# Create your views here.
-
 from rest_framework import generics, permissions
 from .models import Appointment
 from .serializers import AppointmentSerializer
 from datetime import date
+# Create your views here.
 class AppointmentCreateAPIView(generics.CreateAPIView):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer

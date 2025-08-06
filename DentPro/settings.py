@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'patients',  # Custom app for patient management
     'appointment',  # Custom app for appointment management
     'procedures',  # Custom app for procedures management
+    'medicalrecord',  # Custom app for medical records management
 ]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'

@@ -19,7 +19,7 @@ def register_user(request):
     serializer = UnifiedUserSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({'message': 'User created successfully'}, status=status.HTTP_201_CREATED)
+        return Response({'رسالة': 'تم إنشاء المستخدم بنجاح'}, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -29,7 +29,7 @@ def update_user(request):
     serializer = UnifiedUserSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
-        return Response({'message': 'User updated successfully'}, status=status.HTTP_200_OK)
+        return Response({'رسالة': 'تم التعديل على المستخدم بنجاح'}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
@@ -51,7 +51,7 @@ def login_user(request):
             }
         })
     
-    return Response({'detail': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
+    return Response({'التفاصيل': 'الايميل  أو كلمة المرور غير موجود'}, status=status.HTTP_401_UNAUTHORIZED)
 # def login_user(request):
 #     email = request.data.get('email')
 #     password = request.data.get('password')

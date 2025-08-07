@@ -74,7 +74,7 @@ class PrescribedMedication(models.Model):
     """
     وصفة طبية مرتبطة بدواء ,الفحص السريري 
     """
-    clinical_exam = models.ForeignKey("procedures.ClinicalExam", on_delete=models.CASCADE, related_name="medications")
+    clinical_exam = models.OneToOneField("procedures.ClinicalExam", on_delete=models.CASCADE, related_name="medications")
     medication = models.ForeignKey("Medication", on_delete=models.PROTECT, related_name="prescriptions")
     times_per_day = models.IntegerField()
     dose_unit = models.CharField(max_length=50)

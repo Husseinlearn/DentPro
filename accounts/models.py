@@ -99,7 +99,7 @@ class UserProfile(models.Model):
 # --------------------------------------------------------------------
 class Doctor(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='doctor_profile')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='doctor_profile')
     specialization = models.CharField(max_length=100, blank=True, null=True)
     license_number = models.CharField(max_length=50, unique=True)
     revenue_share = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)  # نسبة المشاركة من الإيرادات

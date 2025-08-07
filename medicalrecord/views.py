@@ -17,7 +17,7 @@ from .serializers import (
     MedicalRecordDetailSerializer
 )
 
-# ✅ السجل الطبي
+#  السجل الطبي
 class MedicalRecordListCreateAPIView(generics.ListCreateAPIView):
     queryset = MedicalRecord.objects.all()
     serializer_class = MedicalRecordSerializer
@@ -28,7 +28,7 @@ class MedicalRecordRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAP
     serializer_class = MedicalRecordSerializer
 
 
-# ✅ عرض سجل طبي كامل حسب المريض
+#  عرض سجل طبي كامل حسب المريض
 class MedicalRecordByPatientAPIView(views.APIView):
     def get(self, request, patient_id):
         try:
@@ -40,7 +40,7 @@ class MedicalRecordByPatientAPIView(views.APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# ✅ الأمراض المزمنة
+#  الأمراض المزمنة
 class ChronicDiseaseListCreateAPIView(generics.ListCreateAPIView):
     queryset = ChronicDisease.objects.all()
     serializer_class = ChronicDiseaseSerializer
@@ -51,7 +51,7 @@ class ChronicDiseaseRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyA
     serializer_class = ChronicDiseaseSerializer
 
 
-# ✅ المرفقات
+#  المرفقات
 class AttachmentListCreateAPIView(generics.ListCreateAPIView):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
@@ -62,7 +62,7 @@ class AttachmentRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIVi
     serializer_class = AttachmentSerializer
 
 
-# ✅ الأدوية
+#  الأدوية
 class MedicationListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medication.objects.filter(is_active=True)
     serializer_class = MedicationSerializer

@@ -2,8 +2,10 @@ from django.shortcuts import render
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, permissions
 from .models import Appointment
-from .serializers import AppointmentSerializer
+from .serializers import AppointmentSerializer, AppointmentStatusUpdateSerializer
 from datetime import date
+from rest_framework import status
+from rest_framework.response import Response
 # Create your views here.
 class AppointmentCreateAPIView(generics.CreateAPIView):
     queryset = Appointment.objects.all()
@@ -35,3 +37,18 @@ class TodayAppointmentsAPIView(generics.ListAPIView):
     def get_queryset(self):
         today = date.today()
         return Appointment.objects.filter(date=today).order_by('time')
+class AppointmentStatusUpdateAPIView(generics.UpdateAPIView):
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentStatusUpdateSerializer
+    lookup_field = 'id'  # تأكد أنك تستخدم UUID أو Int حسب الموديل
+
+    def patch(self, request, *args, **kwargs):
+        appointment = self.get_object()
+        serializer = self.get_serializer(appointment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({
+            "message": "تم تحديث حالة الموعد بنجاح.",
+            "appointment_id": str(appointment.id),
+            "new_status": serializer.data['status']
+        }, status=status.HTTP_200_OK)

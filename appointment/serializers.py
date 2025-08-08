@@ -108,3 +108,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
         validated_data.pop('patient_name', None)
         validated_data.pop('doctor_name', None)
         return super().create(validated_data)
+
+class AppointmentStatusUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
+        fields = ['status']  # فقط حقل الحالة

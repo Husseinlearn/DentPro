@@ -8,4 +8,5 @@ urlpatterns = [
     path('detailsapp/<int:id>/', views.AppointmentDetailAPIView.as_view(), name='appointment-detail'),
     path('update/<int:id>/', views.AppointmentUpdateAPIView.as_view(), name='update-appointment'),
     path('today/', views.TodayAppointmentsAPIView.as_view(), name='today-appointments'),
+    path('status-update/<int:id>/', views.AppointmentStatusUpdateAPIView.as_view(), name='appointment-status-update'),
 ]

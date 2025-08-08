@@ -11,7 +11,7 @@ class ClinicalExam(models.Model):
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="clinical_exams")
     doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True)
-    appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
+    appointment = models.OneToOneField(Appointment, on_delete=models.SET_NULL, null=True, blank=True, related_name='clinical_exam')
 
     complaint = models.TextField(blank=True, null=True)
     medical_advice = models.TextField(blank=True, null=True)

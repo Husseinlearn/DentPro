@@ -32,11 +32,14 @@ class MedicalRecordRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAP
 class MedicalRecordByPatientAPIView(views.APIView):
     def get(self, request, patient_id):
         try:
-            medical_record = MedicalRecord.objects.get(patient__id=patient_id)
+            record = MedicalRecord.objects.get(patient__id=patient_id)
         except MedicalRecord.DoesNotExist:
-            return Response({"detail": "Medical record not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Medical record not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        serializer = MedicalRecordDetailSerializer(medical_record)
+        serializer = MedicalRecordDetailSerializer(record)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

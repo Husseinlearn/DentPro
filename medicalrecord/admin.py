@@ -54,12 +54,11 @@ class MedicalRecordAdmin(admin.ModelAdmin):
     patient_details.short_description = "تفاصيل المريض"
 
     def appointment_history(self, obj):
-        print(f"تشغيل appointment_history للسجل الطبي رقم {obj.id}")
         if not obj or not obj.patient:
             return "لا يوجد مريض مرتبط"
 
         patient = obj.patient
-        appointments = Appointment.objects.filter(patient=patient).select_related('doctor__user')
+        appointments = Appointment.objects.filter(patient=patient).select_related('doctor__user', 'clinical_exam')
 
         if not appointments.exists():
             return "لا توجد مواعيد"
@@ -68,16 +67,16 @@ class MedicalRecordAdmin(admin.ModelAdmin):
         for appt in appointments:
             row = f"<b>📅 التاريخ:</b> {appt.date} - <b>🕒 الوقت:</b> {appt.time}<br>"
             row += f"<b>👨‍⚕️ الطبيب:</b> {appt.doctor.user.get_full_name()}<br>"
-            row += f"<b>📌 الحالة:</b> {appt.status}<br>"
+            row += f"<b>📌 الحالة:</b> {appt.get_status_display()}<br>"
 
-            try:
-                exam = appt.clinicalexam  # من خلال related_name
+            exam = getattr(appt, 'clinical_exam', None)
+            if exam:
                 row += "<i>🔍 فحص سريري:</i><br>"
                 row += f"&nbsp;&nbsp;- الشكوى: {exam.complaint or '-'}<br>"
                 row += f"&nbsp;&nbsp;- النصيحة: {exam.medical_advice or '-'}<br>"
                 row += f"&nbsp;&nbsp;- الإجراءات: {exam.planned_procedures or '-'}<br>"
-            except ClinicalExam.DoesNotExist:
-                row += "<i>لا يوجد فحص سريري</i><br>"
+            else:
+                row += "<i>⚠ لا يوجد فحص سريري لهذا الموعد</i><br>"
 
             rows.append(row)
 

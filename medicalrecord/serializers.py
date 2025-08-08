@@ -82,13 +82,13 @@ class ClinicalExamNestedSerializer(serializers.ModelSerializer):
 # -----------------------------
 class AppointmentNestedSerializer(serializers.ModelSerializer):
     doctor = DoctorBasicSerializer(read_only=True)
-    clinicalexam = ClinicalExamNestedSerializer(read_only=True)
+    clinical_exam = ClinicalExamNestedSerializer(read_only=True)
 
     class Meta:
         model = Appointment
         fields = [
             'id', 'date', 'time', 'status', 'reason',
-            'doctor', 'clinicalexam'
+            'doctor', 'clinical_exam'
         ]
 
 

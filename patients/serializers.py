@@ -89,7 +89,7 @@ def validate_date_of_birth(self, value):
         return value.strip()
     #  التحقق من رقم الهاتف
     def validate_phone(self, value):
-        if not re.match(r'^0?7\d{8}$', value):
+        if not re.match(r'^7\d{8}$', value):
             raise serializers.ValidationError("Phone number must be a valid Yemeni number (e.g. +9677XXXXXXXX or 07XXXXXXXX).")
 
         # تحقق من عدم التكرار

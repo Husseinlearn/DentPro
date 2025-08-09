@@ -14,7 +14,7 @@ class FlexibleDateField(serializers.DateField):
                     return datetime.strptime(value, fmt).date()
                 except ValueError:
                     continue
-        raise serializers.ValidationError("Date has wrong format. Use YYYY-MM-DD or DD-MM-YYYY.")
+        raise serializers.ValidationError("تاريخ الميلاد بتنسيق خاطئ. استخدم YYYY-MM-DD أو DD-MM-YYYY أو DD/MM/YYYY.")
 class PatientSerializer(serializers.ModelSerializer):
     date_of_birth = FlexibleDateField()
     class Meta:
@@ -38,7 +38,7 @@ class PatientSerializer(serializers.ModelSerializer):
         full_name = f"{data.get('first_name', '').strip()} {data.get('last_name', '').strip()}"
         parts = full_name.split()
         if len(parts) < 4:
-            raise serializers.ValidationError("Full name must contain at least four words (first and last name combined).")
+            raise serializers.ValidationError("يجب أن يحتوي الاسم الكامل على أربع كلمات على الأقل (الاسم الأول والثاني والثالث والأخير مجتمعين).")
         return data
 
     # #  التحقق من الاسم الأول
@@ -66,7 +66,7 @@ def validate_date_of_birth(self, value):
             except ValueError:
                 continue
         else:
-            raise serializers.ValidationError("Invalid date format. Use YYYY-MM-DD or DD-MM-YYYY.")
+            raise serializers.ValidationError("تاريخ الميلاد بتنسيق خاطئ. استخدم YYYY-MM-DD أو DD-MM-YYYY.")
 
     # إذا كانت القيمة كائن datetime نحولها إلى date فقط
     elif isinstance(value, datetime):
@@ -74,7 +74,7 @@ def validate_date_of_birth(self, value):
 
     # تحقق أن التاريخ ليس في المستقبل
     if value > date.today():
-        raise serializers.ValidationError("Date of birth cannot be in the future.")
+        raise serializers.ValidationError("لا يمكن أن يكون تاريخ الميلاد في المستقبل.")
 
     return value
 
@@ -90,24 +90,24 @@ def validate_date_of_birth(self, value):
     #  التحقق من رقم الهاتف
     def validate_phone(self, value):
         if not re.match(r'^7\d{8}$', value):
-            raise serializers.ValidationError("Phone number must be a valid Yemeni number (e.g. +9677XXXXXXXX or 07XXXXXXXX).")
+            raise serializers.ValidationError("رقم الهاتف يجب أن يبدأ بـ 7 ويتكون من 9 أرقام. مثل (7XXXXXXXX).")
 
         # تحقق من عدم التكرار
         if Patient.objects.filter(phone=value).exclude(id=self.instance.id if self.instance else None).exists():
-            raise serializers.ValidationError("Phone number already exists.")
+            raise serializers.ValidationError("رقم التلفون موجود مسبقاً.")
 
         return value
     
     #  التحقق من البريد الإلكتروني
     def validate_email(self, value):
         if value and Patient.objects.filter(email=value).exclude(id=self.instance.id if self.instance else None).exists():
-            raise serializers.ValidationError("Email already exists.")
+            raise serializers.ValidationError("الايميل موجود مسبقاً.")
         return value
 
     #  التحقق من العنوان
     def validate_address(self, value):
         if len(value.strip()) < 2:
-            raise serializers.ValidationError("Address is too short.")
+            raise serializers.ValidationError("العنوان قصير جدا.")
         return value
 
     #  دالة الإنشاء

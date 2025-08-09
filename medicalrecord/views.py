@@ -35,7 +35,7 @@ class MedicalRecordByPatientAPIView(views.APIView):
             record = MedicalRecord.objects.get(patient__id=patient_id)
         except MedicalRecord.DoesNotExist:
             return Response(
-                {"detail": "Medical record not found."},
+                {"خطأ": "السجل الطبي غير موجود."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -74,3 +74,5 @@ class MedicationListCreateAPIView(generics.ListCreateAPIView):
 class MedicationRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Medication.objects.all()
     serializer_class = MedicationSerializer
+
+

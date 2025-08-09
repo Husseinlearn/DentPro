@@ -54,7 +54,7 @@ class PatientRetrieveUpdateDestroyAPIView(APIView):
     def delete(self, request, pk):
         patient = self.get_object(pk)
         patient.delete()  # This will set is_archived to True
-        return Response({'message': 'Patient Deleted successfully'},status=status.HTTP_204_NO_CONTENT)
+        return Response({'رسالة': 'تم حذف المريض بنجاح'},status=status.HTTP_204_NO_CONTENT)
 
 class PatientDetailAPIView(generics.RetrieveAPIView):
     queryset = Patient.objects.all()

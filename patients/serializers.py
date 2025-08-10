@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from .models import Patient
-from datetime import datetime
+from django.db.models.functions import Lower
+from .models import (Patient , Disease, Medication, PatientDisease, PatientAllergy) 
+from datetime import datetime, date
+
 import re
-from datetime import date
 
 class FlexibleDateField(serializers.DateField):
     def to_internal_value(self, value):
@@ -33,7 +34,7 @@ class PatientSerializer(serializers.ModelSerializer):
             'is_archived',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
-
+    # 1- التحقق من الاسم الكامل
     def validate(self, data):
         full_name = f"{data.get('first_name', '').strip()} {data.get('last_name', '').strip()}"
         parts = full_name.split()
@@ -53,32 +54,32 @@ class PatientSerializer(serializers.ModelSerializer):
     #         raise serializers.ValidationError("Last name must contain only letters.")
     #     return value
 
-    # ✅ التحقق من تنسيق وتاريخ الميلاد
-def validate_date_of_birth(self, value):
-    from datetime import datetime, date
+    # 2- التحقق من تنسيق وتاريخ الميلاد
+    def validate_date_of_birth(self, value):
+        from datetime import datetime, date
 
-    # إذا كانت القيمة نصية (string) نحللها
-    if isinstance(value, str):
-        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
-            try:
-                value = datetime.strptime(value, fmt).date()
-                break
-            except ValueError:
-                continue
-        else:
-            raise serializers.ValidationError("تاريخ الميلاد بتنسيق خاطئ. استخدم YYYY-MM-DD أو DD-MM-YYYY.")
+        # إذا كانت القيمة نصية (string) نحللها
+        if isinstance(value, str):
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+                try:
+                    value = datetime.strptime(value, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise serializers.ValidationError("تاريخ الميلاد بتنسيق خاطئ. استخدم YYYY-MM-DD أو DD-MM-YYYY.")
 
-    # إذا كانت القيمة كائن datetime نحولها إلى date فقط
-    elif isinstance(value, datetime):
-        value = value.date()
+        # إذا كانت القيمة كائن datetime نحولها إلى date فقط
+        elif isinstance(value, datetime):
+            value = value.date()
 
-    # تحقق أن التاريخ ليس في المستقبل
-    if value > date.today():
-        raise serializers.ValidationError("لا يمكن أن يكون تاريخ الميلاد في المستقبل.")
+        # تحقق أن التاريخ ليس في المستقبل
+        if value > date.today():
+            raise serializers.ValidationError("لا يمكن أن يكون تاريخ الميلاد في المستقبل.")
 
-    return value
+        return value
 
-    #  التحقق من الجنس
+    # 3- التحقق من الجنس
     def validate_gender(self, value):
         val = value.strip().lower()
         accepted = ['male', 'female', 'other', 'ذكر', 'أنثى', 'انثى', 'غير ذلك', 'اخر', 'آخر']
@@ -87,7 +88,7 @@ def validate_date_of_birth(self, value):
                 "Gender must be one of: ذكر، أنثى، غير ذلك أو male, female, other."
             )
         return value.strip()
-    #  التحقق من رقم الهاتف
+    # 4- التحقق من رقم الهاتف
     def validate_phone(self, value):
         if not re.match(r'^7\d{8}$', value):
             raise serializers.ValidationError("رقم الهاتف يجب أن يبدأ بـ 7 ويتكون من 9 أرقام. مثل (7XXXXXXXX).")
@@ -98,13 +99,13 @@ def validate_date_of_birth(self, value):
 
         return value
     
-    #  التحقق من البريد الإلكتروني
+    # 5- التحقق من البريد الإلكتروني
     def validate_email(self, value):
         if value and Patient.objects.filter(email=value).exclude(id=self.instance.id if self.instance else None).exists():
             raise serializers.ValidationError("الايميل موجود مسبقاً.")
         return value
 
-    #  التحقق من العنوان
+    # 6- التحقق من العنوان
     def validate_address(self, value):
         if len(value.strip()) < 2:
             raise serializers.ValidationError("العنوان قصير جدا.")
@@ -120,3 +121,37 @@ def validate_date_of_birth(self, value):
             setattr(instance, attr, value)
         instance.save()
         return instance
+    
+# --------------------------------------------------------------------
+# Disease Serializer: تسلسل الأمراض
+# --------------------------------------------------------------------
+class DiseaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Disease
+        fields = ["id", "name", "dental_impact", "is_active", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_name(self, value):
+        qs = Disease.objects.annotate(n=Lower("name")).filter(n=value.strip().lower())
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("اسم المرض موجود مسبقًا (بدون حساسية حالة الأحرف).")
+        return value.strip()
+
+# --------------------------------------------------------------------
+# Medication Serializer: تسلسل الأدوية
+# --------------------------------------------------------------------
+class MedicationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Medication
+        fields = ["id", "name", "dental_impact", "is_active", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_name(self, value):
+        qs = Medication.objects.annotate(n=Lower("name")).filter(n=value.strip().lower())
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("اسم الدواء موجود مسبقًا (بدون حساسية حالة الأحرف).")
+        return value.strip()

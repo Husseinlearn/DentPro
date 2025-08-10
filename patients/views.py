@@ -2,8 +2,10 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics, filters
-from .models import Patient
-from .serializers import PatientSerializer
+from .models import Disease, Patient, Medication
+from .serializers import DiseaseSerializer, PatientSerializer, MedicationSerializer
+from rest_framework import permissions, viewsets
+from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 from .filters import PatientFilter
 from django_filters.rest_framework import DjangoFilterBackend
@@ -60,3 +62,19 @@ class PatientDetailAPIView(generics.RetrieveAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     lookup_field = 'id'
+
+# --------------------------------------------------------------------
+# Disease ViewSet:إنشاء وعرض وتعديل وحذف الأمراض
+# --------------------------------------------------------------------
+class DiseaseViewSet(viewsets.ModelViewSet):
+    queryset = Disease.objects.all().order_by("name")
+    serializer_class = DiseaseSerializer
+    # permission_classes = [permissions.IsAuthenticated]  # غيّرها حسب حاجتك
+
+# --------------------------------------------------------------------
+# Medication ViewSet:إنشاء وعرض وتعديل وحذف الأدوية
+# --------------------------------------------------------------------
+class MedicationViewSet(viewsets.ModelViewSet):
+    queryset = Medication.objects.all().order_by("name")
+    serializer_class = MedicationSerializer
+    # permission_classes = [permissions.IsAuthenticated]  # غيّرها حسب حاجتك

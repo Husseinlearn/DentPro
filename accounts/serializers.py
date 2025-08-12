@@ -62,7 +62,7 @@ class UnifiedUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"password": "كلمتا المرور غير متطابقتين."})
 
         if attrs.get('user_type') == 'doctor' and 'doctor_profile' not in self.initial_data:
-            raise serializers.ValidationError({"ملف الطبيب": "بيانات الطبيب مطلوبة لنوع المستخدم 'doctor'."})
+            raise serializers.ValidationError({"DoctorProfile": "بيانات الطبيب مطلوبة لنوع المستخدم 'doctor'."})
         return attrs
 
     def validate(self, data):

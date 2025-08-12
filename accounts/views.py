@@ -52,6 +52,58 @@ def login_user(request):
         })
     
     return Response({'error': 'الايميل  أو كلمة المرور غير موجود'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    serializer = UnifiedUserSerializer(request.user)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def list_users(request):
+    users = CustomUser.objects.all()
+    serializer = UnifiedUserSerializer(users, many=True)
+    return Response(serializer.data)
+
+
+
+class DoctorListSimpleAPIView(generics.ListAPIView):
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        doctors = Doctor.objects.all()
+        data = [
+            {
+                "id": str(doctor.id),
+                "name": doctor.user.get_full_name(),
+                "email": doctor.user.email
+            }
+            for doctor in doctors
+        ]
+        return Response(data)
+
+class DoctorDetailAPIView(generics.RetrieveAPIView):
+    queryset = Doctor.objects.select_related('user', 'user__profile').all()
+    serializer_class = DoctorProfileSerializer
+    lookup_field = 'id'
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def logout_user(request):
+#     try:
+#         refresh_token = request.data.get("refresh")
+#         if not refresh_token:
+#             return Response({"detail": "Refresh token is required."}, status=400)
+
+#         token = RefreshToken(refresh_token)
+#         token.blacklist()  #  إضافة التوكن إلى قائمة الحظر
+
+#         return Response({"detail": "Logout successful. Token blacklisted."}, status=status.HTTP_205_RESET_CONTENT)
+
+#     except Exception as e:
+#         return Response({"detail": "Invalid or expired refresh token."}, status=status.HTTP_400_BAD_REQUEST)
+
 # def login_user(request):
 #     email = request.data.get('email')
 #     password = request.data.get('password')
@@ -85,53 +137,3 @@ def login_user(request):
 #         })
 
 #     return Response({'detail': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def current_user(request):
-    serializer = UnifiedUserSerializer(request.user)
-    return Response(serializer.data)
-
-@api_view(['GET'])
-@permission_classes([IsAdminUser])
-def list_users(request):
-    users = CustomUser.objects.all()
-    serializer = UnifiedUserSerializer(users, many=True)
-    return Response(serializer.data)
-
-
-
-class DoctorListSimpleAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        doctors = Doctor.objects.all()
-        data = [
-            {
-                "id": str(doctor.id),
-                "name": doctor.user.get_full_name(),
-                "email": doctor.user.email
-            }
-            for doctor in doctors
-        ]
-        return Response(data)
-
-class DoctorDetailAPIView(generics.RetrieveAPIView):
-    queryset = Doctor.objects.select_related('user', 'user__profile').all()
-    serializer_class = DoctorProfileSerializer
-    lookup_field = 'id'
-# @api_view(['POST'])
-# @permission_classes([IsAuthenticated])
-# def logout_user(request):
-#     try:
-#         refresh_token = request.data.get("refresh")
-#         if not refresh_token:
-#             return Response({"detail": "Refresh token is required."}, status=400)
-
-#         token = RefreshToken(refresh_token)
-#         token.blacklist()  #  إضافة التوكن إلى قائمة الحظر
-
-#         return Response({"detail": "Logout successful. Token blacklisted."}, status=status.HTTP_205_RESET_CONTENT)
-
-#     except Exception as e:
-#         return Response({"detail": "Invalid or expired refresh token."}, status=status.HTTP_400_BAD_REQUEST)

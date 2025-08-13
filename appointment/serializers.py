@@ -2,12 +2,59 @@ from rest_framework import serializers
 from django.db.models import Value as V
 from django.db.models.functions import Concat
 from django.db.models import Q
-from datetime import date
+from datetime import date ,datetime,time 
 from .models import Appointment
 from patients.models import Patient
 from accounts.models import Doctor
 
+class FlexibleTimeField(serializers.TimeField):
+    def to_internal_value(self, value):
+        if isinstance(value, time):
+            return value
+        if isinstance(value, str):
+            s = value.strip().lower()
+
+            # دعم العربية: ص/م و "صباحًا/مساءً"
+            s = (s.replace("ص", "am")
+                    .replace("صباحًا", "am")
+                    .replace("صباحا", "am")
+                    .replace("م", "pm")
+                    .replace("مساءً", "pm")
+                    .replace("مساء", "pm"))
+
+            # إزالة المسافات الزائدة بين الرقم و am/pm (مثال: "2pm" أو "2 pm")
+            s = " ".join(s.split())
+
+            # لو جاء "2 pm" بدون دقائق، نفترض ":00"
+            if any(s.endswith(x) for x in ("am", "pm")) and ":" not in s:
+                s = s.replace(" am", ":00 am").replace(" pm", ":00 pm")
+
+            formats = [
+                "%H:%M",
+                "%H:%M:%S",
+                "%I:%M %p",
+                "%I %p",
+                "%I:%M%p",
+                "%I%p",
+            ]
+            for fmt in formats:
+                try:
+                    return datetime.strptime(s, fmt).time()
+                except ValueError:
+                    continue
+
+        raise serializers.ValidationError(
+            "صيغة الوقت غير صحيحة. الصيغ المقبولة: "
+            "HH:MM أو HH:MM:SS (24h) أو hh:mm AM/PM أو h AM/PM "
+            "وأيضًا ص/م أو صباحًا/مساءً."
+        )
+
+    # لعرض الوقت دائمًا 12 ساعة في الاستجابة
+    def to_representation(self, value):
+        return value.strftime("%I:%M %p")  # مثال: 02:30 PM
+
 class AppointmentSerializer(serializers.ModelSerializer):
+    time = FlexibleTimeField()
     patient_name = serializers.CharField(write_only=True, required=False)
     doctor_name = serializers.CharField(write_only=True, required=False)
 

@@ -16,6 +16,10 @@ class FlexibleDateField(serializers.DateField):
                 except ValueError:
                     continue
         raise serializers.ValidationError("تاريخ الميلاد بتنسيق خاطئ. استخدم YYYY-MM-DD أو DD-MM-YYYY أو DD/MM/YYYY.")
+
+# --------------------------------------------------------------------
+# Patient Serializer: تسجيل المريض والتحقق من بياناته
+# --------------------------------------------------------------------
 class PatientSerializer(serializers.ModelSerializer):
     date_of_birth = FlexibleDateField()
     class Meta:
@@ -123,7 +127,7 @@ class PatientSerializer(serializers.ModelSerializer):
         return instance
     
 # --------------------------------------------------------------------
-# Disease Serializer: تسلسل الأمراض
+# Disease Serializer: تسجيل الأمراض والتحقق من أنها غير موجود مسبقًا 
 # --------------------------------------------------------------------
 class DiseaseSerializer(serializers.ModelSerializer):
     class Meta:
@@ -140,7 +144,7 @@ class DiseaseSerializer(serializers.ModelSerializer):
         return value.strip()
 
 # --------------------------------------------------------------------
-# Medication Serializer: تسلسل الأدوية
+# Medication Serializer: تسجيل الأدوية الحساسة والتحقق من أنها غير موجود مسبقًا 
 # --------------------------------------------------------------------
 class MedicationSerializer(serializers.ModelSerializer):
     class Meta:

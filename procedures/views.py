@@ -1,7 +1,4 @@
 from django.shortcuts import render
-from rest_framework import generics
-# from .models import ClinicalExam
-# from .serializers import ClinicalExamSerializer
 from rest_framework import generics, status, views
 from rest_framework.response import Response
 
@@ -12,26 +9,12 @@ from .models import (
 from .serializers import (
     ClinicalExamSerializer, ProcedureCategorySerializer, DentalProcedureSerializer,
     ToothcodeSerializer, ProcedureSerializer, ProcedureToothcodeSerializer,
-    ProcedureAttachTeethSerializer
+    ProcedureAttachTeethSerializer, ProcedureCategoryDetailSerializer
 )
-# Create your views here.
-# class ClinicalExamListCreateView(generics.ListCreateAPIView):
-#     """
-#     عرض وإنشاء جلسات الفحص السريري
-#     """
-#     queryset = ClinicalExam.objects.all()
-#     serializer_class = ClinicalExamSerializer
 
-
-# class ClinicalExamDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     """
-#     عرض أو تعديل أو حذف جلسة فحص سريري واحدة
-#     """
-#     queryset = ClinicalExam.objects.all()
-#     serializer_class = ClinicalExamSerializer
-
-
+# ---------------------------
 # ClinicalExam
+# ---------------------------
 class ClinicalExamListCreateAPIView(generics.ListCreateAPIView):
     queryset = ClinicalExam.objects.select_related("patient", "doctor", "appointment").all()
     serializer_class = ClinicalExamSerializer
@@ -43,14 +26,44 @@ class ClinicalExamRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ClinicalExam.objects.select_related("patient", "doctor", "appointment").all()
     serializer_class = ClinicalExamSerializer
 
-# Dictionary
+
+# ---------------------------
+# Dictionary: Categories & Procedures
+# ---------------------------
+
+# فئات الإجراءات: قائمة/إنشاء — نُظهر الإجراءات التابعة عند GET فقط
 class ProcedureCategoryListCreateAPIView(generics.ListCreateAPIView):
-    queryset = ProcedureCategory.objects.all()
+    serializer_class = ProcedureCategorySerializer  # الافتراضي (للإنشاء)
+
+    def get_queryset(self):
+        qs = ProcedureCategory.objects.all()
+        # عند القراءة فقط، نُحمّل الإجراءات المرتبطة لتفادي N+1
+        if self.request.method == "GET":
+            qs = qs.prefetch_related("procedures")
+        return qs
+
+    def get_serializer_class(self):
+        # عند GET نعرض الفئة مع الإجراءات
+        if self.request.method == "GET":
+            return ProcedureCategoryDetailSerializer
+        return ProcedureCategorySerializer
+
+
+# فئة واحدة: عرض/تعديل/حذف — مع الإجراءات عند GET
+class ProcedureCategoryRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProcedureCategorySerializer
 
-class ProcedureCategoryRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ProcedureCategory.objects.all()
-    serializer_class = ProcedureCategorySerializer
+    def get_queryset(self):
+        qs = ProcedureCategory.objects.all()
+        if self.request.method == "GET":
+            qs = qs.prefetch_related("procedures")
+        return qs
+
+    def get_serializer_class(self):
+        if self.request.method == "GET":
+            return ProcedureCategoryDetailSerializer
+        return ProcedureCategorySerializer
+
 
 class DentalProcedureListCreateAPIView(generics.ListCreateAPIView):
     queryset = DentalProcedure.objects.select_related("category").all()
@@ -59,9 +72,13 @@ class DentalProcedureListCreateAPIView(generics.ListCreateAPIView):
     search_fields = ["name", "description"]
 
 class DentalProcedureRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = DentalProcedure.objects.all()
+    queryset = DentalProcedure.objects.select_related("category").all()
     serializer_class = DentalProcedureSerializer
 
+
+# ---------------------------
+# Toothcode
+# ---------------------------
 class ToothcodeListAPIView(generics.ListAPIView):
     queryset = Toothcode.objects.all()
     serializer_class = ToothcodeSerializer
@@ -69,7 +86,10 @@ class ToothcodeListAPIView(generics.ListAPIView):
     search_fields = ["tooth_number", "description"]
     ordering_fields = ["tooth_type", "tooth_number"]
 
-# Execution
+
+# ---------------------------
+# Execution: Procedure & links
+# ---------------------------
 class ProcedureListCreateAPIView(generics.ListCreateAPIView):
     queryset = Procedure.objects.select_related("definition", "category", "clinical_exam").all()
     serializer_class = ProcedureSerializer
@@ -81,6 +101,7 @@ class ProcedureRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Procedure.objects.select_related("definition", "category", "clinical_exam").all()
     serializer_class = ProcedureSerializer
 
+
 class ProcedureToothcodeListCreateAPIView(generics.ListCreateAPIView):
     queryset = ProcedureToothcode.objects.select_related("procedure", "toothcode", "performed_by").all()
     serializer_class = ProcedureToothcodeSerializer
@@ -91,7 +112,10 @@ class ProcedureToothcodeRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProcedureToothcode.objects.all()
     serializer_class = ProcedureToothcodeSerializer
 
-# Bulk attach
+
+# ---------------------------
+# Bulk attach teeth
+# ---------------------------
 class ProcedureAttachTeethAPIView(views.APIView):
     def post(self, request):
         ser = ProcedureAttachTeethSerializer(data=request.data)

@@ -38,7 +38,7 @@ class ClinicalExam(models.Model):
 # قاموس الإجراءات (تعريفي)
 # =========================
 class DentalProcedure(models.Model):
-    category = models.ForeignKey('ProcedureCategory', on_delete=models.SET_NULL, null=True, blank=True, related_name='definitions')
+    category = models.ForeignKey('ProcedureCategory', on_delete=models.SET_NULL, null=True, blank=True, related_name='procedures')
     name = models.CharField(max_length=150, unique=True, db_index=True)
     description = models.TextField(blank=True, null=True)
     default_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)

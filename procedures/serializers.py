@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
 class FlexiblePKOrSlugRelatedField(serializers.Field):
     """
-    هذا class يسمح بادخال الاجراءات او التصنيفات وارقام الاسنان حسب الاسم او ID 
+    هذا class يسمح بادخال الاجراءات او التصنيفات وارقام الاسنان حسب الاسم او ID
     """
     def __init__(self, queryset, slug_field='name', prefer_slug=False, **kwargs):
         super().__init__(**kwargs)
@@ -83,14 +83,20 @@ class FlexiblePKOrSlugRelatedField(serializers.Field):
 
         raise serializers.ValidationError("Invalid value type.")
 
+
 # ===== Basic serializers =====
 class ProcedureCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProcedureCategory
         fields = ["id", "name", "description", "created_at"]
         read_only_fields = ["id", "created_at"]
+
     def validate_name(self, value):
-        if ProcedureCategory.objects.filter(name__iexact=value.strip()).exists():
+        # إصلاح: استثناء السجل الحالي عند التعديل
+        qs = ProcedureCategory.objects.filter(name__iexact=value.strip())
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
             raise serializers.ValidationError("هذا التصنيف موجود بالفعل.")
         return value.strip()
 
@@ -98,7 +104,7 @@ class ProcedureCategorySerializer(serializers.ModelSerializer):
 class DentalProcedureSerializer(serializers.ModelSerializer):
     category = FlexiblePKOrSlugRelatedField(
         queryset=ProcedureCategory.objects.all(),
-        slug_field='name',        # نبحث بالاسم
+        slug_field='name',        # بحث بالاسم
         prefer_slug=False         # للأسماء عادةً مش رقمية
     )
     category_name = serializers.CharField(source="category.name", read_only=True)
@@ -191,6 +197,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        # عند ربط تعريف جديد، عَبّي القيم المفقودة فقط (إزالة التكرار السابق)
         definition = validated_data.get("definition")
         if definition:
             validated_data.setdefault("name", definition.name)
@@ -199,19 +206,6 @@ class ProcedureSerializer(serializers.ModelSerializer):
             if validated_data.get("cost") in (None, ""):
                 validated_data["cost"] = definition.default_price
             if not validated_data.get("category") and getattr(definition, "category_id", None):
-                validated_data["category_id"] = definition.category_id
-        return super().update(instance, validated_data)
-
-    def update(self, instance, validated_data):
-        # عند ربط تعريف جديد، عَبّي القيم المفقودة فقط
-        definition = validated_data.get("definition")
-        if definition:
-            validated_data.setdefault("name", definition.name)
-            if validated_data.get("description") in (None, ""):
-                validated_data["description"] = definition.description
-            if validated_data.get("cost") in (None, ""):
-                validated_data["cost"] = definition.default_price
-            if not validated_data.get("category") and definition.category_id:
                 validated_data["category_id"] = definition.category_id
         return super().update(instance, validated_data)
 
@@ -243,6 +237,24 @@ class ProcedureAttachTeethSerializer(serializers.Serializer):
                 notes=it.get("notes", "")
             ))
         return ProcedureToothcode.objects.bulk_create(objs)
+
+
+# ===== Nested display for categories with procedures =====
+class DentalProcedureInlineSerializer(serializers.ModelSerializer):
+    """لعرض الإجراءات داخل الفئة بدون تضمين حقل category لتفادي التكرار."""
+    class Meta:
+        model = DentalProcedure
+        fields = ["id", "name", "description", "default_price", "is_active"]
+
+
+class ProcedureCategoryDetailSerializer(serializers.ModelSerializer):
+    """يعرض الفئة ومعها الإجراءات المرتبطة بها (للاستخدام في GET للفئات)."""
+    procedures = DentalProcedureInlineSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ProcedureCategory
+        fields = ["id", "name", "description", "created_at", "procedures"]
+        read_only_fields = ["id", "created_at", "procedures"]
 
 # class ClinicalExamSerializer(serializers.ModelSerializer):
 #     class Meta:

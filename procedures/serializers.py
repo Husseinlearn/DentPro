@@ -8,11 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
 class FlexiblePKOrSlugRelatedField(serializers.Field):
     """
-    حقل مرن لعلاقات الـ FK:
-    - يقبل: رقم id (int أو str أرقام)، أو الاسم (slug_field) كسلسلة.
-    - يقبل أيضًا dict مثل: {"id": 3} أو {"name": "..." }.
-    - قابل لإعادة الاستخدام مع أي موديل عبر تمرير queryset و slug_field.
-    - يمكن جعل الأولوية للاسم إذا كانت القيمة رقمية عبر prefer_slug=True.
+    هذا class يسمح بادخال الاجراءات او التصنيفات وارقام الاسنان حسب الاسم او ID 
     """
     def __init__(self, queryset, slug_field='name', prefer_slug=False, **kwargs):
         super().__init__(**kwargs)

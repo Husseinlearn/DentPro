@@ -62,5 +62,49 @@
     "license_number": "DOC-2003-002",
     "revenue_share": 28.0
     }
+},
+{
+    "_comment":"الطريقة الاولى ",
+    "first_name": "عز الدين محمد",
+    "last_name": "الحميري",
+    "date_of_birth": "12/11/1999",
+    "gender": "male",
+    "phone": "735987654",
+    "email": "nour@example.com",
+    "address": "عدن",
+    "diseases": [
+        1,
+        {
+            "name": "ربو"
+        },
+        "حساسية الأنف"
+    ],
+    "allergies": [
+        {
+            "id": 1
+        },
+        "Ibuprofen",
+        {
+            "name": "Lidocaine"
+        }
+    ]
+},
+{
+    "_comment": "الطريقة الثانية  ",
+    "first_name": "حسين علي",
+    "last_name": "عبده السباعي",
+    "date_of_birth": "2000-05-12",
+    "gender": "ذكر",
+    "phone": "733123456",
+    "email": "hussein@example.com",
+    "address": "صنعاء",
+    "diseases": [
+        "سكري",
+        "ضغط"
+    ],
+    "allergies": [
+        "Penicillin",
+        "Aspirin"
+    ]
 }
 ]

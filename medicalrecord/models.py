@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from patients.models import Patient
+from patients.models import Patient, Disease
 from accounts.models import Doctor
 from appointment.models import Appointment
 # Create your models here.
@@ -20,20 +20,7 @@ class MedicalRecord(models.Model):
         return f"Medical Record - {self.patient}"
 
 
-class ChronicDisease(models.Model):
-    """الأمراض المزمنة المرتبطة بسجل المريض"""
-    
-    medical_record = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, related_name='chronic_diseases')
-    disease_name = models.CharField(max_length=255)
-    notes = models.TextField(blank=True, null=True)
-    diagnosed_at = models.DateField(blank=True, null=True)
 
-    class Meta:
-        verbose_name = _("Chronic Disease")
-        verbose_name_plural = _("Chronic Diseases")
-
-    def __str__(self):
-        return f"{self.disease_name} - {self.medical_record.patient}"
 
 
 class Attachment(models.Model):
@@ -60,11 +47,15 @@ class Attachment(models.Model):
 
 class Medication(models.Model):
     """تعريف دواء متاح في النظام"""
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name=_("Medication Name"))
     description = models.TextField(blank=True, null=True)
-    default_dose_unit = models.CharField(max_length=50, blank=True, null=True)  # مثال: حبة، كبسولة
-    is_active = models.BooleanField(default=True)
+    default_dose_unit = models.CharField(max_length=50, blank=True, null=True, verbose_name=_("Default Dose Unit"))  # مثال: حبة، كبسولة
+    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
 
+    class Meta:
+        verbose_name = _("Medication")
+        verbose_name_plural = _("Medications")
+        ordering = ["name"]
     def __str__(self):
         return self.name
 
@@ -74,17 +65,132 @@ class PrescribedMedication(models.Model):
     """
     وصفة طبية مرتبطة بدواء ,الفحص السريري 
     """
-    clinical_exam = models.OneToOneField("procedures.ClinicalExam", on_delete=models.CASCADE, related_name="medications")
-    medication = models.ForeignKey("Medication", on_delete=models.PROTECT, related_name="prescriptions")
-    times_per_day = models.IntegerField()
-    dose_unit = models.CharField(max_length=50)
-    number_of_days = models.IntegerField()
-    notes = models.TextField(blank=True, null=True)
+    clinical_exam = models.ForeignKey(
+        "procedures.ClinicalExam", 
+        on_delete=models.CASCADE,
+        related_name="prescribed_medications",
+        verbose_name=_("Clinical Exam")
+        )
+    medication = models.ForeignKey(
+        Medication,
+        on_delete=models.PROTECT,
+        related_name="prescriptions",
+        verbose_name=_("Medication")
+        )
+    times_per_day = models.PositiveIntegerField(verbose_name=_("Times Per Day"))
+    dose_unit = models.CharField(max_length=50, verbose_name=_("Dose Unit"))
+    number_of_days = models.PositiveIntegerField(verbose_name=_("Number Of Days"))
+    notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
 
-    prescribed_by = models.ForeignKey("accounts.Doctor", on_delete=models.SET_NULL, null=True)
-    prescribed_at = models.DateTimeField(auto_now_add=True)
+    prescribed_by = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True, verbose_name=_("Prescribed By"))
+    prescribed_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Prescribed At"))
+    class Meta:
+        verbose_name = _("Prescribed Medication")
+        verbose_name_plural = _("Prescribed Medications")
+        ordering = ["-prescribed_at"]
+        constraints = [
+            models.CheckConstraint(check=models.Q(times_per_day__gt=0), name="pm_times_per_day_gt_0"),
+            models.CheckConstraint(check=models.Q(number_of_days__gt=0), name="pm_number_of_days_gt_0"),
+        ]
 
     def __str__(self):
         return f"{self.medication.name} for {self.clinical_exam.patient}"
 
 
+# -------------------------------------------------
+# 3) حزمة أدوية مرتبطة بمرض مزمن (Disease)
+# -------------------------------------------------
+class MedicationPackage(models.Model):
+    """
+    حزمة أدوية جاهزة لمرض/حالة مزمنة محدّدة (مثال: التهاب اللثة)
+    تُستخدم كقالب لتوليد عناصر وصفة داخل الفحص السريري.
+    """
+    name = models.CharField(max_length=255, verbose_name=_("Package Name"))
+    disease = models.ForeignKey(
+        Disease, on_delete=models.PROTECT, related_name="medication_packages", verbose_name=_("Disease")
+    )
+    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
+    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
+
+    class Meta:
+        verbose_name = _("Medication Package")
+        verbose_name_plural = _("Medication Packages")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_active"]),
+            models.Index(fields=["disease"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.disease})"
+
+
+# -------------------------------------------------
+# 4) عناصر الحزمة: دواء + جرعات ومدّة افتراضية
+# -------------------------------------------------
+class MedicationPackageItem(models.Model):
+    package = models.ForeignKey(
+        MedicationPackage, on_delete=models.CASCADE, related_name="items", verbose_name=_("Package")
+    )
+    medication = models.ForeignKey(
+        Medication, on_delete=models.PROTECT, related_name="package_items", verbose_name=_("Medication")
+    )
+    times_per_day = models.PositiveIntegerField(default=1, verbose_name=_("Times Per Day"))
+    dose_unit = models.CharField(max_length=50, verbose_name=_("Dose Unit"))
+    number_of_days = models.PositiveIntegerField(default=1, verbose_name=_("Number Of Days"))
+    notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
+
+    class Meta:
+        verbose_name = _("Medication Package Item")
+        verbose_name_plural = _("Medication Package Items")
+        unique_together = ("package", "medication")
+        constraints = [
+            models.CheckConstraint(check=models.Q(times_per_day__gt=0), name="mpi_times_per_day_gt_0"),
+            models.CheckConstraint(check=models.Q(number_of_days__gt=0), name="mpi_number_of_days_gt_0"),
+        ]
+
+    def __str__(self):
+        return f"{self.medication} ×{self.times_per_day}/day for {self.number_of_days}d"
+
+
+# -------------------------------------------------
+# 5) سجل تطبيق الحزمة على فحص سريري (Audit)
+# -------------------------------------------------
+class AppliedMedicationPackage(models.Model):
+    """
+    أثر التطبيق: متى ولمن طُبّقت الحزمة ومن الطبيب وبأي نمط.
+    لا تُخزّن الأدوية نفسها هنا؛ الأدوية الفعلية تُنشأ في PrescribedMedication.
+    """
+    MODE_APPEND = "append"
+    MODE_REPLACE = "replace"
+    MODE_CHOICES = (
+        (MODE_APPEND, "append"),
+        (MODE_REPLACE, "replace"),
+    )
+
+    clinical_exam = models.ForeignKey(
+        "procedures.ClinicalExam",
+        on_delete=models.CASCADE,
+        related_name="applied_medication_packages",
+        verbose_name=_("Clinical Exam"),
+    )
+    package = models.ForeignKey(
+        MedicationPackage, on_delete=models.PROTECT, verbose_name=_("Medication Package")
+    )
+    prescribed_by = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True, verbose_name=_("Prescribed By"))
+    prescribed_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Applied At"))
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default=MODE_APPEND, verbose_name=_("Mode"))
+
+    class Meta:
+        verbose_name = _("Applied Medication Package")
+        verbose_name_plural = _("Applied Medication Packages")
+        ordering = ["-prescribed_at"]
+        indexes = [
+            models.Index(fields=["mode"]),
+            models.Index(fields=["clinical_exam"]),
+            models.Index(fields=["package"]),
+        ]
+
+    def __str__(self):
+        return f"Applied {self.package} to exam #{self.clinical_exam_id} ({self.mode})"

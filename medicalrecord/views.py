@@ -1,30 +1,40 @@
-from django.shortcuts import render
+# medicalrecord/views.py
 from rest_framework import generics, views, status
 from rest_framework.response import Response
 
 from .models import (
     MedicalRecord,
-    ChronicDisease,
     Attachment,
-    Medication
+    Medication,
+    PrescribedMedication,
+    MedicationPackage,
+    AppliedMedicationPackage,
 )
 
 from .serializers import (
     MedicalRecordSerializer,
-    ChronicDiseaseSerializer,
+    MedicalRecordDetailSerializer,
     AttachmentSerializer,
     MedicationSerializer,
-    MedicalRecordDetailSerializer
+    PrescribedMedicationSerializer,
+    MedicationPackageSerializer,
+    ApplyMedicationPackageSerializer,
 )
 
-#  السجل الطبي
+# ================================================
+#                السجل الطبي
+# ================================================
 class MedicalRecordListCreateAPIView(generics.ListCreateAPIView):
-    queryset = MedicalRecord.objects.all()
+    queryset = (MedicalRecord.objects
+                .select_related('patient')
+                .prefetch_related('attachments'))
     serializer_class = MedicalRecordSerializer
 
 
 class MedicalRecordRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = MedicalRecord.objects.all()
+    queryset = (MedicalRecord.objects
+                .select_related('patient')
+                .prefetch_related('attachments'))
     serializer_class = MedicalRecordSerializer
 
 
@@ -32,29 +42,21 @@ class MedicalRecordRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAP
 class MedicalRecordByPatientAPIView(views.APIView):
     def get(self, request, patient_id):
         try:
-            record = MedicalRecord.objects.get(patient__id=patient_id)
+            record = (MedicalRecord.objects
+                        .prefetch_related('attachments')
+                        .select_related('patient')
+                        .get(patient__id=patient_id))
         except MedicalRecord.DoesNotExist:
-            return Response(
-                {"خطأ": "السجل الطبي غير موجود."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"خطأ": "السجل الطبي غير موجود."},
+                            status=status.HTTP_404_NOT_FOUND)
 
         serializer = MedicalRecordDetailSerializer(record)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-#  الأمراض المزمنة
-class ChronicDiseaseListCreateAPIView(generics.ListCreateAPIView):
-    queryset = ChronicDisease.objects.all()
-    serializer_class = ChronicDiseaseSerializer
-
-
-class ChronicDiseaseRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ChronicDisease.objects.all()
-    serializer_class = ChronicDiseaseSerializer
-
-
-#  المرفقات
+# ================================================
+#                    المرفقات
+# ================================================
 class AttachmentListCreateAPIView(generics.ListCreateAPIView):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
@@ -65,7 +67,9 @@ class AttachmentRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIVi
     serializer_class = AttachmentSerializer
 
 
-#  الأدوية
+# ================================================
+#                     الأدوية
+# ================================================
 class MedicationListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medication.objects.filter(is_active=True)
     serializer_class = MedicationSerializer
@@ -76,3 +80,98 @@ class MedicationRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIVi
     serializer_class = MedicationSerializer
 
 
+# ================================================
+#        الأدوية المصروفة (PrescribedMedication)
+# ================================================
+class PrescribedMedicationListCreateAPIView(generics.ListCreateAPIView):
+    """
+    يدعم فلترة عناصر الوصفة حسب الفحص السريري: ?clinical_exam=<id>
+    """
+    serializer_class = PrescribedMedicationSerializer
+
+    def get_queryset(self):
+        qs = (PrescribedMedication.objects
+              .select_related('clinical_exam', 'medication', 'prescribed_by'))
+        exam_id = self.request.query_params.get('clinical_exam')
+        if exam_id:
+            qs = qs.filter(clinical_exam_id=exam_id)
+        return qs
+
+
+class PrescribedMedicationRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = (PrescribedMedication.objects
+                .select_related('clinical_exam', 'medication', 'prescribed_by'))
+    serializer_class = PrescribedMedicationSerializer
+
+
+# ================================================
+#        حِزم الأدوية (Medication Packages)
+# ================================================
+class MedicationPackageListCreateAPIView(generics.ListCreateAPIView):
+    """
+    فلترة مدعومة:
+      - ?is_active=true|false
+      - ?disease=<id>
+    """
+    serializer_class = MedicationPackageSerializer
+
+    def get_queryset(self):
+        qs = (MedicationPackage.objects
+              .select_related('disease')
+              .prefetch_related('items__medication'))
+        is_active = self.request.query_params.get('is_active')
+        disease = self.request.query_params.get('disease')
+
+        if is_active is not None:
+            if is_active.lower() in ('true', '1'):
+                qs = qs.filter(is_active=True)
+            elif is_active.lower() in ('false', '0'):
+                qs = qs.filter(is_active=False)
+
+        if disease:
+            qs = qs.filter(disease_id=disease)
+
+        return qs
+
+
+class MedicationPackageRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = (MedicationPackage.objects
+                .select_related('disease')
+                .prefetch_related('items__medication'))
+    serializer_class = MedicationPackageSerializer
+
+
+class MedicationPackageApplyAPIView(views.APIView):
+    """
+    تطبيق حزمة أدوية على فحص سريري.
+    المسار المقترح: POST /api/medicalrecord/medication-packages/<int:pk>/apply/
+    الجسم:
+    {
+      "clinical_exam_id": 101,
+      "mode": "append" | "replace"
+    }
+    """
+    def post(self, request, pk):
+        try:
+            package = (MedicationPackage.objects
+                       .select_related('disease')
+                       .prefetch_related('items__medication')
+                       .get(pk=pk, is_active=True))
+        except MedicationPackage.DoesNotExist:
+            return Response({"detail": "الحزمة غير موجودة أو غير مفعلة."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ApplyMedicationPackageSerializer(
+            data=request.data,
+            context={"request": request, "package": package}
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+
+        # (اختياري) أعدّ أيضًا عدّاد التطبيقات
+        AppliedMedicationPackage.objects.filter(package=package).count()
+
+        return Response(
+            {"detail": "تم تطبيق الحزمة بنجاح.", **result},
+            status=status.HTTP_201_CREATED
+        )

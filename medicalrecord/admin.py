@@ -12,6 +12,10 @@ from .models import (
 )
 from appointment.models import Appointment
 
+# استيراد نماذج الإجراءات من تطبيق procedures
+# ملاحظة: لو كانت أسماء الموديلات مختلفة عندك، عدّلها هنا
+from procedures.models import Procedure, ProcedureToothcode
+
 
 # ===========================
 # Inlines
@@ -43,6 +47,8 @@ class MedicalRecordAdmin(admin.ModelAdmin):
         "patient_diseases_list",
         "patient_allergies_list",
         "appointment_history",
+        "procedures_history",      # جديد: عرض الإجراءات المنفّذة
+        "prescriptions_history",   # جديد: عرض الوصفات المصروفة
     ]
     fields = [
         "patient",
@@ -50,6 +56,8 @@ class MedicalRecordAdmin(admin.ModelAdmin):
         "patient_diseases_list",
         "patient_allergies_list",
         "appointment_history",
+        "procedures_history",      # جديد
+        "prescriptions_history",   # جديد
         "created_at", "updated_at",
     ]
     inlines = [AttachmentInline]
@@ -97,7 +105,6 @@ class MedicalRecordAdmin(admin.ModelAdmin):
     patient_diseases_list.short_description = "الأمراض المزمنة"
 
     # --- حساسيّات الأدوية (افترض related_name='patient_allergies')
-    # ملاحظة: نستعمل getattr لتفادي الأخطاء إن لم توجد الحقول
     def patient_allergies_list(self, obj):
         if not obj or not obj.patient:
             return "لا يوجد مريض مرتبط"
@@ -151,6 +158,153 @@ class MedicalRecordAdmin(admin.ModelAdmin):
             rows.append(row)
         return format_html("<hr>".join(rows))
     appointment_history.short_description = "سجل المواعيد والفحوصات"
+
+    # --- الإجراءات المنفّذة على أسنان المريض
+    def procedures_history(self, obj):
+        if not obj or not obj.patient:
+            return "لا يوجد مريض مرتبط"
+
+        qs = (
+            Procedure.objects
+            .filter(clinical_exam__patient=obj.patient)
+            .select_related("clinical_exam__appointment", "definition", "clinical_exam__doctor__user")
+            .order_by("-created_at")
+        )
+
+        if not qs.exists():
+            return "لا توجد إجراءات مسجّلة"
+
+        rows = []
+        for proc in qs:
+            # اسم الإجراء التعريفي
+            proc_name = (
+                getattr(getattr(proc, "dental_procedure", None), "name", None)
+                or getattr(getattr(proc, "procedure", None), "name", None)
+                or getattr(proc, "procedure_name", None)
+                or "إجراء غير محدد"
+            )
+
+            # الأسنان المرتبطة
+            teeth_parts = []
+            try:
+                tqs = (
+                    ProcedureToothcode.objects
+                    .filter(procedure=proc)
+                    .select_related("toothcode")
+                )
+                for t in tqs:
+                    tc = getattr(t, "toothcode", None)
+                    code = (
+                        getattr(tc, "code", None)
+                        or getattr(tc, "number", None)
+                        or getattr(tc, "name", None)
+                    )
+                    if code:
+                        teeth_parts.append(str(code))
+            except Exception:
+                pass
+
+            # fallback: علاقة مباشرة M2M إن وُجدت
+            if not teeth_parts:
+                rel = getattr(proc, "teeth", None)
+                if rel is not None:
+                    try:
+                        for tc in rel.all():
+                            code = (
+                                getattr(tc, "code", None)
+                                or getattr(tc, "number", None)
+                                or getattr(tc, "name", None)
+                            )
+                            if code:
+                                teeth_parts.append(str(code))
+                    except Exception:
+                        pass
+
+            teeth_txt = ", ".join(teeth_parts) if teeth_parts else "—"
+
+            # الطبيب
+            performed_by = getattr(proc, "performed_by", None)
+            doctor_name = (
+                getattr(getattr(performed_by, "user", None), "get_full_name", lambda: None)()  # type: ignore
+                if performed_by else None
+            ) or "—"
+
+            # الموعد
+            appt = getattr(getattr(proc, "clinical_exam", None), "appointment", None)
+            appt_date = getattr(appt, "date", None) or "—"
+            appt_time = getattr(appt, "time", None) or "—"
+
+            notes = getattr(proc, "notes", None) or "—"
+            created_at = getattr(proc, "created_at", None) or "—"
+
+            row = (
+                f"<b>🧾 الإجراء:</b> {proc_name}<br>"
+                f"<b>🦷 الأسنان:</b> {teeth_txt}<br>"
+                f"<b>👨‍⚕️ الطبيب:</b> {doctor_name}<br>"
+                f"<b>📅 الموعد:</b> {appt_date} — {appt_time}<br>"
+                f"<b>📝 ملاحظات:</b> {notes}<br>"
+                f"<b>⏱️ أُنشئ في:</b> {created_at}"
+            )
+            rows.append(row)
+
+        return format_html("<hr>".join(rows))
+
+    procedures_history.short_description = "الإجراءات المنفّذة"
+
+    # --- الوصفات الطبية المصروفة (أدوية مفردة لكل فحص)
+    def prescriptions_history(self, obj):
+        if not obj or not obj.patient:
+            return "لا يوجد مريض مرتبط"
+
+        qs = (
+            PrescribedMedication.objects
+            .filter(clinical_exam__patient=obj.patient)
+            .select_related(
+                "medication",
+                "prescribed_by__user",
+                "clinical_exam__appointment",
+            )
+            .order_by("-prescribed_at")
+        )
+
+        if not qs.exists():
+            return "لا توجد وصفات مصروفة"
+
+        rows = []
+        for pm in qs:
+            med_name = getattr(getattr(pm, "medication", None), "name", None) or "—"
+            times_per_day = getattr(pm, "times_per_day", None)
+            dose_unit = getattr(pm, "dose_unit", None) or "—"
+            number_of_days = getattr(pm, "number_of_days", None)
+            notes = getattr(pm, "notes", None) or "—"
+
+            prescriber = getattr(pm, "prescribed_by", None)
+            prescriber_name = (
+                getattr(getattr(prescriber, "user", None), "get_full_name", lambda: None)()  # type: ignore
+                if prescriber else None
+            ) or "—"
+
+            prescribed_at = getattr(pm, "prescribed_at", None) or "—"
+
+            appt = getattr(getattr(pm, "clinical_exam", None), "appointment", None)
+            appt_date = getattr(appt, "date", None) or "—"
+            appt_time = getattr(appt, "time", None) or "—"
+
+            row = (
+                f"<b>💊 الدواء:</b> {med_name}<br>"
+                f"<b>⏰ الجرعات/اليوم:</b> {times_per_day if times_per_day is not None else '—'}<br>"
+                f"<b>🧪 وحدة الجرعة:</b> {dose_unit}<br>"
+                f"<b>📆 عدد الأيام:</b> {number_of_days if number_of_days is not None else '—'}<br>"
+                f"<b>📝 ملاحظات:</b> {notes}<br>"
+                f"<b>👨‍⚕️ الموصي:</b> {prescriber_name}<br>"
+                f"<b>🕒 وقت الصرف:</b> {prescribed_at}<br>"
+                f"<b>📅 الموعد:</b> {appt_date} — {appt_time}"
+            )
+            rows.append(row)
+
+        return format_html("<hr>".join(rows))
+
+    prescriptions_history.short_description = "الوصفات الطبية المصروفة"
 
 
 # ===========================

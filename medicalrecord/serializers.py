@@ -67,7 +67,7 @@ class PrescribedMedicationNestedSerializer(serializers.ModelSerializer):
         ]
 
 
-# (optional) full serializer for create/update via API
+# (full serializer for create/update via API)
 class PrescribedMedicationSerializer(serializers.ModelSerializer):
     medication_name = serializers.CharField(source="medication.name", read_only=True)
 
@@ -80,12 +80,24 @@ class PrescribedMedicationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "prescribed_at"]
 
+    # تعبئة الموصي تلقائياً من المستخدم إن وُجد
+    def create(self, validated_data):
+        request = self.context.get("request")
+        doctor = getattr(getattr(request, "user", None), "doctor", None)
+        if doctor and "prescribed_by" not in validated_data:
+            validated_data["prescribed_by"] = doctor
+        return super().create(validated_data)
+
 
 # -------------------------------------------------
 # Clinical Exam (Nested inside appointment)
+# ملاحظة: تم حذف planned_procedures حسب اتفاقنا
 # -------------------------------------------------
 class ClinicalExamNestedSerializer(serializers.ModelSerializer):
-    # ملاحظة: related_name على الموديل = prescribed_medications
+    # الملاحظة العامة للوصفة (تمت إضافتها في Model: ClinicalExam)
+    prescription_notes = serializers.CharField(read_only=True)
+
+    # قائمة الأدوية الموصوفة داخل الفحص
     medications = PrescribedMedicationNestedSerializer(
         many=True, read_only=True, source="prescribed_medications"
     )
@@ -93,8 +105,11 @@ class ClinicalExamNestedSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClinicalExam
         fields = [
-            "id", "complaint", "medical_advice",
-            "planned_procedures", "created_at",
+            "id",
+            "complaint",
+            "medical_advice",
+            "prescription_notes",  # ملاحظات الوصفة العامة
+            "created_at",
             "medications",
         ]
 
@@ -130,9 +145,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 
 # -------------------------------------------------
-# Patient Diseases & Allergies (read-only mirrors from patients app)
-# ملاحظة: نفترض أن related_name على PatientDisease = patient_diseases
-# وعلى PatientAllergy = patient_allergies
+# Patient Diseases & Allergies (read-only mirrors)
 # -------------------------------------------------
 class PatientDiseaseReadSerializer(serializers.ModelSerializer):
     disease_name = serializers.CharField(source="disease.name", read_only=True)
@@ -144,12 +157,11 @@ class PatientDiseaseReadSerializer(serializers.ModelSerializer):
 
 class PatientAllergyReadSerializer(serializers.ModelSerializer):
     medication_name = serializers.CharField(source="medication.name", read_only=True)
-    
-    
+
     class Meta:
         model = PatientAllergy
         fields = ["id", "medication", "medication_name"]
-    
+
 
 # -------------------------------------------------
 # Medical Record (Basic)
@@ -169,7 +181,6 @@ class MedicalRecordDetailSerializer(serializers.ModelSerializer):
     attachments = AttachmentSerializer(many=True, read_only=True)
     appointments = serializers.SerializerMethodField()
 
-    # expose diseases & allergies through patient relation
     diseases = PatientDiseaseReadSerializer(
         source="patient.patient_diseases", many=True, read_only=True
     )
@@ -186,17 +197,18 @@ class MedicalRecordDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_appointments(self, obj):
-        qs = (Appointment.objects
-                .filter(patient=obj.patient)
-                .select_related("doctor")
-                .order_by("-date"))
+        qs = (
+            Appointment.objects
+            .filter(patient=obj.patient)
+            .select_related("doctor")
+            .order_by("-date")
+        )
         return AppointmentNestedSerializer(qs, many=True).data
 
 
 # =================================================
 #              Medication Packages (CRUD)
 # =================================================
-
 class MedicationPackageItemSerializer(serializers.ModelSerializer):
     medication_name = serializers.CharField(source="medication.name", read_only=True)
 
@@ -230,11 +242,9 @@ class MedicationPackageSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
-        # تحديث الرأس
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
         instance.save()
-        # استبدال العناصر إن أُرسلت
         if items_data is not None:
             instance.items.all().delete()
             for item in items_data:
@@ -243,8 +253,7 @@ class MedicationPackageSerializer(serializers.ModelSerializer):
 
 
 # -------------------------------------------------
-# Apply Medication Package to a Clinical Exam
-# (يُستخدم في action على الـ ViewSet)
+# Apply Medication Package to a Clinical Exam (action)
 # -------------------------------------------------
 class ApplyMedicationPackageSerializer(serializers.Serializer):
     clinical_exam_id = serializers.IntegerField()
@@ -254,7 +263,6 @@ class ApplyMedicationPackageSerializer(serializers.Serializer):
         pkg: MedicationPackage = self.context["package"]
         if not pkg.is_active:
             raise serializers.ValidationError("هذه الحزمة غير مفعلة.")
-        # تأكد من وجود الفحص
         try:
             exam = ClinicalExam.objects.get(pk=attrs["clinical_exam_id"])
         except ClinicalExam.DoesNotExist:
@@ -269,7 +277,6 @@ class ApplyMedicationPackageSerializer(serializers.Serializer):
         doctor = validated_data.get("doctor")
         mode = validated_data["mode"]
 
-        # إذا replace نحذف الأدوية الحالية للفحص
         if mode == "replace":
             PrescribedMedication.objects.filter(clinical_exam=exam).delete()
 
@@ -290,3 +297,68 @@ class ApplyMedicationPackageSerializer(serializers.Serializer):
             clinical_exam=exam, package=pkg, prescribed_by=doctor, mode=mode
         )
         return {"created_ids": created_ids, "count": len(created_ids), "mode": mode, "package_id": pkg.id}
+
+
+# =================================================
+# Create a full prescription (General notes + items)
+# =================================================
+class PrescriptionItemInputSerializer(serializers.Serializer):
+    medication = serializers.PrimaryKeyRelatedField(queryset=Medication.objects.filter(is_active=True))
+    times_per_day = serializers.IntegerField(min_value=1)
+    dose_unit = serializers.CharField(max_length=50)
+    number_of_days = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(allow_blank=True, required=False)
+
+class PrescriptionUpsertSerializer(serializers.Serializer):
+    clinical_exam = serializers.PrimaryKeyRelatedField(queryset=ClinicalExam.objects.all())
+    general_notes = serializers.CharField(allow_blank=True, required=False)
+    items = PrescriptionItemInputSerializer(many=True)
+
+    def validate(self, attrs):
+        if not attrs.get("items"):
+            raise serializers.ValidationError("يجب إضافة دواء واحد على الأقل.")
+        return attrs
+
+    def create(self, validated_data):
+        exam = validated_data["clinical_exam"]
+        # حفظ الملاحظة العامة
+        exam.prescription_notes = validated_data.get("general_notes") or None
+        exam.save(update_fields=["prescription_notes"])
+
+        request = self.context.get("request")
+        prescribed_by = getattr(getattr(request, "user", None), "doctor", None)
+
+        created = []
+        for it in validated_data["items"]:
+            pm = PrescribedMedication.objects.create(
+                clinical_exam=exam,
+                medication=it["medication"],
+                times_per_day=it["times_per_day"],
+                dose_unit=it["dose_unit"],
+                number_of_days=it["number_of_days"],
+                notes=it.get("notes") or None,
+                prescribed_by=prescribed_by,
+            )
+            created.append(pm)
+
+        # رجّع تمثيل غني يحتوي نفس المدخلات + أسماء الأدوية وتواريخ الإنشاء
+        items_repr = []
+        for pm in created:
+            items_repr.append({
+                "id": pm.id,
+                "medication": pm.medication.id,
+                "medication_name": pm.medication.name,
+                "times_per_day": pm.times_per_day,
+                "dose_unit": pm.dose_unit,
+                "number_of_days": pm.number_of_days,
+                "notes": pm.notes,
+                "prescribed_by": getattr(pm.prescribed_by, "id", None),
+                "prescribed_at": pm.prescribed_at,
+            })
+
+        return {
+            "clinical_exam": exam.id,
+            "general_notes": exam.prescription_notes,
+            "count": len(created),
+            "items": items_repr,
+        }

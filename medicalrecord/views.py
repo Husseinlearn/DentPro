@@ -1,4 +1,3 @@
-# medicalrecord/views.py
 from rest_framework import generics, views, status
 from rest_framework.response import Response
 
@@ -19,6 +18,7 @@ from .serializers import (
     PrescribedMedicationSerializer,
     MedicationPackageSerializer,
     ApplyMedicationPackageSerializer,
+    PrescriptionUpsertSerializer,
 )
 
 # ================================================
@@ -91,7 +91,7 @@ class PrescribedMedicationListCreateAPIView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         qs = (PrescribedMedication.objects
-              .select_related('clinical_exam', 'medication', 'prescribed_by'))
+                .select_related('clinical_exam', 'medication', 'prescribed_by'))
         exam_id = self.request.query_params.get('clinical_exam')
         if exam_id:
             qs = qs.filter(clinical_exam_id=exam_id)
@@ -110,15 +110,15 @@ class PrescribedMedicationRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDe
 class MedicationPackageListCreateAPIView(generics.ListCreateAPIView):
     """
     فلترة مدعومة:
-      - ?is_active=true|false
-      - ?disease=<id>
+        - ?is_active=true|false
+        - ?disease=<id>
     """
     serializer_class = MedicationPackageSerializer
 
     def get_queryset(self):
         qs = (MedicationPackage.objects
-              .select_related('disease')
-              .prefetch_related('items__medication'))
+                .select_related('disease')
+                .prefetch_related('items__medication'))
         is_active = self.request.query_params.get('is_active')
         disease = self.request.query_params.get('disease')
 
@@ -147,16 +147,16 @@ class MedicationPackageApplyAPIView(views.APIView):
     المسار المقترح: POST /api/medicalrecord/medication-packages/<int:pk>/apply/
     الجسم:
     {
-      "clinical_exam_id": 101,
-      "mode": "append" | "replace"
+        "clinical_exam_id": 101,
+        "mode": "append" | "replace"
     }
     """
     def post(self, request, pk):
         try:
             package = (MedicationPackage.objects
-                       .select_related('disease')
-                       .prefetch_related('items__medication')
-                       .get(pk=pk, is_active=True))
+                        .select_related('disease')
+                        .prefetch_related('items__medication')
+                        .get(pk=pk, is_active=True))
         except MedicationPackage.DoesNotExist:
             return Response({"detail": "الحزمة غير موجودة أو غير مفعلة."},
                             status=status.HTTP_404_NOT_FOUND)
@@ -175,3 +175,16 @@ class MedicationPackageApplyAPIView(views.APIView):
             {"detail": "تم تطبيق الحزمة بنجاح.", **result},
             status=status.HTTP_201_CREATED
         )
+
+
+class PrescribedMedicationListCreateAPIView(generics.ListCreateAPIView):
+    queryset = PrescribedMedication.objects.select_related("clinical_exam", "medication", "prescribed_by")
+    serializer_class = PrescribedMedicationSerializer
+
+class PrescriptionUpsertAPIView(generics.CreateAPIView):
+    serializer_class = PrescriptionUpsertSerializer
+    def create(self, request, *args, **kwargs):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        result = ser.save()              # <-- هذا هو dict الذي أعدته create()
+        return Response(result, status=status.HTTP_201_CREATED)

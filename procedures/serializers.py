@@ -1,23 +1,33 @@
 from rest_framework import serializers
-from .models import (
-    ClinicalExam, ProcedureCategory, DentalProcedure,
-    Toothcode, Procedure, ProcedureToothcode
-)
-from accounts.models import Doctor
+from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
+from .models import (
+    ClinicalExam,
+    ClinicalExamItem,
+    ProcedureCategory,
+    DentalProcedure,
+    Toothcode,
+)
+from accounts.models import Doctor
+from appointment.models import Appointment
+
+
+# =====================================================================
+# مرن: يقبل id أو الاسم (أو أي حقل slug تختاره) ويرجعه ككائن
+# =====================================================================
 class FlexiblePKOrSlugRelatedField(serializers.Field):
     """
-    هذا class يسمح بادخال الاجراءات او التصنيفات وارقام الاسنان حسب الاسم او ID
+    يسمح بإدخال الكيانات عبر الـ id أو عبر اسم (slug_field).
+    مفيد لحقول مثل: الإجراء بالاسم، السن برقم السن...إلخ
     """
     def __init__(self, queryset, slug_field='name', prefer_slug=False, **kwargs):
         super().__init__(**kwargs)
         self.queryset = queryset
         self.slug_field = slug_field
-        self.prefer_slug = prefer_slug  # مفيد لحقول قد تكون قيمتها رقمية مثل tooth_number
+        self.prefer_slug = prefer_slug
 
     def to_representation(self, value):
-        # في الاستجابة أعِد الـ id (أبسط شيء)، ويمكن تخصيصه لو أردت
         return value.pk if value is not None else None
 
     def _get_by_pk(self, pk):
@@ -28,7 +38,6 @@ class FlexiblePKOrSlugRelatedField(serializers.Field):
         return self.queryset.get(**lookup)
 
     def to_internal_value(self, data):
-        # دعم dict: {"id": ..} أو {"<slug_field>": ".."}
         if isinstance(data, dict):
             if 'id' in data and data['id'] not in (None, ''):
                 try:
@@ -39,60 +48,69 @@ class FlexiblePKOrSlugRelatedField(serializers.Field):
                 try:
                     return self._get_by_slug(data[self.slug_field])
                 except MultipleObjectsReturned:
-                    raise serializers.ValidationError(f"Multiple objects found for {self.slug_field}='{data[self.slug_field]}'. Please use id.")
+                    raise serializers.ValidationError(
+                        f"Multiple objects found for {self.slug_field}='{data[self.slug_field]}'. Please use id."
+                    )
                 except ObjectDoesNotExist:
-                    raise serializers.ValidationError(f"Object with {self.slug_field}='{data[self.slug_field]}' not found.")
+                    raise serializers.ValidationError(
+                        f"Object with {self.slug_field}='{data[self.slug_field]}' not found."
+                    )
             raise serializers.ValidationError(f"Provide either 'id' or '{self.slug_field}'.")
 
-        # دعم رقم أو سلسلة
         if isinstance(data, int) or (isinstance(data, str) and data.strip() != ''):
             s = str(data).strip()
             is_digit = s.isdigit()
 
-            # لو prefer_slug=True و القيمة رقمية، جرّب الاسم أولًا ثم id
             if is_digit and self.prefer_slug:
                 try:
                     return self._get_by_slug(s)
                 except MultipleObjectsReturned:
-                    raise serializers.ValidationError(f"Multiple objects found for {self.slug_field}='{s}'. Please use id.")
+                    raise serializers.ValidationError(
+                        f"Multiple objects found for {self.slug_field}='{s}'. Please use id."
+                    )
                 except ObjectDoesNotExist:
-                    # لم نجد بالاسم، جرّب id
                     try:
                         return self._get_by_pk(int(s))
                     except ObjectDoesNotExist:
                         raise serializers.ValidationError(f"Object with id={s} not found.")
-            # السيناريو العادي: جرّب id ثم الاسم
+
             if is_digit:
                 try:
                     return self._get_by_pk(int(s))
                 except ObjectDoesNotExist:
-                    # لو لم يوجد كـ id، حاول كاسم
                     try:
                         return self._get_by_slug(s)
                     except MultipleObjectsReturned:
-                        raise serializers.ValidationError(f"Multiple objects found for {self.slug_field}='{s}'. Please use id.")
+                        raise serializers.ValidationError(
+                            f"Multiple objects found for {self.slug_field}='{s}'. Please use id."
+                        )
                     except ObjectDoesNotExist:
-                        raise serializers.ValidationError(f"Object not found by id or {self.slug_field}='{s}'.")
-            # قيمة نصية غير رقمية => تعامل معها كاسم
+                        raise serializers.ValidationError(
+                            f"Object not found by id or {self.slug_field}='{s}'."
+                        )
+
             try:
                 return self._get_by_slug(s)
             except MultipleObjectsReturned:
-                raise serializers.ValidationError(f"Multiple objects found for {self.slug_field}='{s}'. Please use id.")
+                raise serializers.ValidationError(
+                    f"Multiple objects found for {self.slug_field}='{s}'. Please use id."
+                )
             except ObjectDoesNotExist:
                 raise serializers.ValidationError(f"Object with {self.slug_field}='{s}' not found.")
 
         raise serializers.ValidationError("Invalid value type.")
 
 
-# ===== Basic serializers =====
+# =====================================================================
+# Basic / dictionary serializers
+# =====================================================================
 class ProcedureCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProcedureCategory
-        fields = ["id", "name", "description", "created_at"]
+        fields = ["id", "name", "description, ", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def validate_name(self, value):
-        # إصلاح: استثناء السجل الحالي عند التعديل
         qs = ProcedureCategory.objects.filter(name__iexact=value.strip())
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -104,8 +122,8 @@ class ProcedureCategorySerializer(serializers.ModelSerializer):
 class DentalProcedureSerializer(serializers.ModelSerializer):
     category = FlexiblePKOrSlugRelatedField(
         queryset=ProcedureCategory.objects.all(),
-        slug_field='name',        # بحث بالاسم
-        prefer_slug=False         # للأسماء عادةً مش رقمية
+        slug_field='name',
+        prefer_slug=False
     )
     category_name = serializers.CharField(source="category.name", read_only=True)
 
@@ -122,151 +140,176 @@ class ToothcodeSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+# =====================================================================
+# Clinical Exam + Items
+# =====================================================================
+class ClinicalExamItemSerializer(serializers.ModelSerializer):
+    procedure_name = serializers.CharField(source="procedure.name", read_only=True)
+    category_name = serializers.CharField(source="procedure.category.name", read_only=True)
+    tooth_number = serializers.CharField(source="toothcode.tooth_number", read_only=True)
+    tooth_type = serializers.CharField(source="toothcode.tooth_type", read_only=True)
+
+    class Meta:
+        model = ClinicalExamItem
+        fields = [
+            "id",
+            "clinical_exam",
+            "procedure",
+            "procedure_name",
+            "category_name",
+            "toothcode",
+            "tooth_number",
+            "tooth_type",
+            "notes",
+            "performed_by",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at", "procedure_name", "category_name", "tooth_number", "tooth_type"]
+
+
 class ClinicalExamSerializer(serializers.ModelSerializer):
     patient_display = serializers.SerializerMethodField()
     doctor_display = serializers.SerializerMethodField()
+    items = ClinicalExamItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = ClinicalExam
         fields = [
             "id", "patient", "doctor", "appointment",
-            "complaint", "medical_advice", "planned_procedures",
-            "created_at", "patient_display", "doctor_display",
+            "complaint", "medical_advice",
+            "created_at",
+            "patient_display", "doctor_display",
+            "items",
         ]
-        read_only_fields = ["id", "created_at", "patient_display", "doctor_display"]
+        read_only_fields = ["id", "created_at", "patient_display", "doctor_display", "items"]
 
     def get_patient_display(self, obj):
         return f"{obj.patient.first_name} {obj.patient.last_name}" if obj.patient_id else None
 
     def get_doctor_display(self, obj):
-        return f"{obj.doctor.user.first_name} {obj.doctor.user.last_name}" if obj.doctor_id else None
+        try:
+            return f"{obj.doctor.user.first_name} {obj.doctor.user.last_name}" if obj.doctor_id else None
+        except Exception:
+            return None
 
 
-# ===== Execution serializers =====
-class ProcedureToothcodeSerializer(serializers.ModelSerializer):
-    tooth_number = serializers.CharField(source="toothcode.tooth_number", read_only=True)
-    tooth_type = serializers.CharField(source="toothcode.tooth_type", read_only=True)
+# =====================================================================
+# Submit-all-in-one Serializer (يعتمد على appointment)
+# =====================================================================
+class ClinicalExamSubmitSerializer(serializers.Serializer):
+    """
+    عند الضغط على "حفظ": ننشئ/نحدّث الفحص المرتبط بالموعد،
+    ثم ننشئ سطور العناصر (إجراء × سن) دفعة واحدة.
+    """
+    appointment = serializers.PrimaryKeyRelatedField(queryset=Appointment.objects.all())
 
-    class Meta:
-        model = ProcedureToothcode
-        fields = [
-            "id", "procedure", "toothcode", "tooth_number", "tooth_type",
-            "performed_by", "notes", "performed_at", "created_at",
-        ]
-        read_only_fields = ["id", "performed_at", "created_at", "tooth_number", "tooth_type"]
+    # حقول الفحص
+    complaint = serializers.CharField(allow_blank=True, required=False)
+    medical_advice = serializers.CharField(allow_blank=True, required=False)
 
-
-class ProcedureSerializer(serializers.ModelSerializer):
-    # يقبل id أو name لكلا الحقلين
-    definition = FlexiblePKOrSlugRelatedField(
-        queryset=DentalProcedure.objects.all(),
-        slug_field='name',
-        prefer_slug=False
+    # إجراءات متعددة + أسنان متعددة
+    # تقبل IDs مباشرة. لو تحب السماح بالأسماء استخدم FlexiblePKOrSlugRelatedField(many=True)
+    procedures = serializers.PrimaryKeyRelatedField(
+        queryset=DentalProcedure.objects.filter(is_active=True), many=True
     )
-    category = FlexiblePKOrSlugRelatedField(
-        queryset=ProcedureCategory.objects.all(),
-        slug_field='name',
-        prefer_slug=False,
-        required=False, allow_null=True
-    )
+    teeth = serializers.PrimaryKeyRelatedField(queryset=Toothcode.objects.all(), many=True, required=False)
+    # أو أرسل أرقام الأسنان بدلاً من IDs:
+    tooth_numbers = serializers.ListField(child=serializers.CharField(), required=False)
 
-    teeth = ProcedureToothcodeSerializer(source="tooth_links", many=True, read_only=True)
-    definition_name = serializers.CharField(source="definition.name", read_only=True)
-    category_name = serializers.CharField(source="category.name", read_only=True)
-
-    class Meta:
-        model = Procedure
-        fields = [
-            "id", "clinical_exam", "definition", "definition_name", "category", "category_name",
-            "name", "description", "cost", "status", "created_at", "teeth",
-        ]
-        read_only_fields = ["id", "created_at", "definition_name", "category_name", "teeth"]
+    # خيارات إضافية
+    notes = serializers.CharField(allow_blank=True, required=False)
+    performed_by = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False, allow_null=True)
+    replace_items = serializers.BooleanField(required=False, default=True)  # استبدال العناصر السابقة
 
     def validate(self, data):
+        if not data.get("procedures"):
+            raise serializers.ValidationError({"procedures": "اختر إجراءً واحدًا على الأقل."})
+
+        if not data.get("teeth") and not data.get("tooth_numbers"):
+            raise serializers.ValidationError("أرسل teeth (IDs) أو tooth_numbers (أرقام الأسنان).")
+
+        # تحويل أرقام الأسنان إلى كائنات Toothcode
+        if data.get("tooth_numbers"):
+            nums = [str(n).strip() for n in data["tooth_numbers"] if str(n).strip()]
+            found = list(Toothcode.objects.filter(tooth_number__in=nums))
+            found_nums = {t.tooth_number for t in found}
+            missing = [n for n in nums if n not in found_nums]
+            if missing:
+                raise serializers.ValidationError({"tooth_numbers": f"أرقام أسنان غير موجودة: {missing}"})
+            data["teeth"] = found
         return data
 
     def create(self, validated_data):
-        definition = validated_data.get("definition")
-        if definition:
-            validated_data.setdefault("name", definition.name)
-            validated_data.setdefault("description", definition.description)
-            if validated_data.get("cost") in (None, ""):
-                validated_data["cost"] = definition.default_price
-            if not validated_data.get("category") and getattr(definition, "category_id", None):
-                validated_data["category_id"] = definition.category_id
-        return super().create(validated_data)
+        appt = validated_data["appointment"]
+        complaint = validated_data.get("complaint", "")
+        advice = validated_data.get("medical_advice", "")
+        procs = validated_data["procedures"]
+        teeth = validated_data["teeth"]
+        notes = validated_data.get("notes", "")
+        replace = validated_data.get("replace_items", True)
 
-    def update(self, instance, validated_data):
-        # عند ربط تعريف جديد، عَبّي القيم المفقودة فقط (إزالة التكرار السابق)
-        definition = validated_data.get("definition")
-        if definition:
-            validated_data.setdefault("name", definition.name)
-            if validated_data.get("description") in (None, ""):
-                validated_data["description"] = definition.description
-            if validated_data.get("cost") in (None, ""):
-                validated_data["cost"] = definition.default_price
-            if not validated_data.get("category") and getattr(definition, "category_id", None):
-                validated_data["category_id"] = definition.category_id
-        return super().update(instance, validated_data)
+        performed_by = validated_data.get("performed_by")
+        if not performed_by and getattr(appt, "doctor_id", None):
+            performed_by = appt.doctor
+
+        with transaction.atomic():
+            # (1) إنشاء/تحديث الفحص على أساس appointment
+            exam, created = ClinicalExam.objects.get_or_create(
+                appointment=appt,
+                defaults={
+                    "patient": getattr(appt, "patient", None),
+                    "doctor": getattr(appt, "doctor", None),
+                    "complaint": complaint,
+                    "medical_advice": advice,
+                }
+            )
+            if not created:
+                exam.complaint = complaint
+                exam.medical_advice = advice
+                exam.save(update_fields=["complaint", "medical_advice"])
+
+            # (2) استبدال العناصر القديمة إن لزم
+            if replace:
+                ClinicalExamItem.objects.filter(clinical_exam=exam).delete()
+
+            # (3) إنشاء العناصر (إجراء × سن)
+            rows = [
+                ClinicalExamItem(
+                    clinical_exam=exam,
+                    procedure=p,
+                    toothcode=t,
+                    notes=notes,
+                    performed_by=performed_by,
+                )
+                for p in procs for t in teeth
+            ]
+            created_items = ClinicalExamItem.objects.bulk_create(rows, ignore_conflicts=True)
+
+        # نعيد exam + العناصر
+        return {"exam": exam, "items": created_items}
+
+    def to_representation(self, instance):
+        exam = instance["exam"]
+        items = instance["items"]
+        return {
+            "exam": ClinicalExamSerializer(exam).data,
+            "items": ClinicalExamItemSerializer(items, many=True).data,
+        }
 
 
-# ===== Bulk attach teeth =====
-class ProcedureAttachTeethItemSerializer(serializers.Serializer):
-    toothcode = FlexiblePKOrSlugRelatedField(
-        queryset=Toothcode.objects.all(),
-        slug_field='tooth_number',
-        prefer_slug=True  # لأن tooth_number ممكن يكون رقم أيضًا، نعطي الأولوية له
-    )
-    performed_by = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False, allow_null=True)
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-
-class ProcedureAttachTeethSerializer(serializers.Serializer):
-    procedure = serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.all())
-    items = ProcedureAttachTeethItemSerializer(many=True)
-
-    def create(self, validated_data):
-        proc = validated_data["procedure"]
-        items = validated_data["items"]
-        objs = []
-        for it in items:
-            objs.append(ProcedureToothcode(
-                procedure=proc,
-                toothcode=it["toothcode"],
-                performed_by=it.get("performed_by"),
-                notes=it.get("notes", "")
-            ))
-        return ProcedureToothcode.objects.bulk_create(objs)
-
-
-# ===== Nested display for categories with procedures =====
+# =====================================================================
+# Nested display for categories with procedures (للواجهات)
+# =====================================================================
 class DentalProcedureInlineSerializer(serializers.ModelSerializer):
-    """لعرض الإجراءات داخل الفئة بدون تضمين حقل category لتفادي التكرار."""
     class Meta:
         model = DentalProcedure
         fields = ["id", "name", "description", "default_price", "is_active"]
 
 
 class ProcedureCategoryDetailSerializer(serializers.ModelSerializer):
-    """يعرض الفئة ومعها الإجراءات المرتبطة بها (للاستخدام في GET للفئات)."""
     procedures = DentalProcedureInlineSerializer(many=True, read_only=True)
 
     class Meta:
         model = ProcedureCategory
         fields = ["id", "name", "description", "created_at", "procedures"]
         read_only_fields = ["id", "created_at", "procedures"]
-
-# class ClinicalExamSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = ClinicalExam
-#         fields = [
-#             'id',
-#             'patient',
-#             'doctor',
-#             'appointment',
-#             'complaint',
-#             'medical_advice',
-#             'planned_procedures',
-#             'created_at',
-#         ]
-#         read_only_fields = ['id', 'created_at']

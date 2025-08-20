@@ -1,34 +1,28 @@
 from django.urls import path
 from .views import (
-    ClinicalExamListCreateAPIView, ClinicalExamRUDAPIView,
+    ClinicalExamListCreateAPIView, ClinicalExamRUDAPIView, ClinicalExamSubmitAPIView,
     ProcedureCategoryListCreateAPIView, ProcedureCategoryRUDAPIView,
     DentalProcedureListCreateAPIView, DentalProcedureRUDAPIView,
     ToothcodeListAPIView,
-    ProcedureListCreateAPIView, ProcedureRUDAPIView,
-    ProcedureToothcodeListCreateAPIView, ProcedureToothcodeRUDAPIView,
-    ProcedureAttachTeethAPIView,
+    ClinicalExamItemListCreateAPIView, ClinicalExamItemRUDAPIView,
 )
 
-app_name = "procedures"
-
 urlpatterns = [
-    # ClinicalExam
+    # Clinical Exam
     path("clinical-exams/", ClinicalExamListCreateAPIView.as_view(), name="exam-list-create"),
     path("clinical-exams/<int:pk>/", ClinicalExamRUDAPIView.as_view(), name="exam-rud"),
+    path("clinical-exams/submit/", ClinicalExamSubmitAPIView.as_view(), name="clinical-exams-submit"),
 
-    # Dictionary
+    # Dictionaries
     path("categories/", ProcedureCategoryListCreateAPIView.as_view(), name="category-list-create"),
     path("categories/<int:pk>/", ProcedureCategoryRUDAPIView.as_view(), name="category-rud"),
-    path("dental-procedures/", DentalProcedureListCreateAPIView.as_view(), name="definition-list-create"),
-    path("dental-procedures/<int:pk>/", DentalProcedureRUDAPIView.as_view(), name="definition-rud"),
+    path("dental-procedure/", DentalProcedureListCreateAPIView.as_view(), name="definition-list-create"),
+    path("dental-procedure/<int:pk>/", DentalProcedureRUDAPIView.as_view(), name="definition-rud"),
+
+    # Teeth
     path("teeth/", ToothcodeListAPIView.as_view(), name="tooth-list"),
 
-    # Execution
-    path("procedures/", ProcedureListCreateAPIView.as_view(), name="procedure-list-create"),
-    path("procedures/<int:pk>/", ProcedureRUDAPIView.as_view(), name="procedure-rud"),
-    path("procedure-teeth/", ProcedureToothcodeListCreateAPIView.as_view(), name="procedure-tooth-list-create"),
-    path("procedure-teeth/<int:pk>/", ProcedureToothcodeRUDAPIView.as_view(), name="procedure-tooth-rud"),
-
-    # Bulk attach teeth to a procedure
-    path("procedures/attach-teeth/", ProcedureAttachTeethAPIView.as_view(), name="procedure-attach-teeth"),
+    # Exam Items
+    path("exam-items/", ClinicalExamItemListCreateAPIView.as_view(), name="exam-item-list-create"),
+    path("exam-items/<int:pk>/", ClinicalExamItemRUDAPIView.as_view(), name="exam-item-rud"),
 ]

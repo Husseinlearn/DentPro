@@ -10,20 +10,26 @@ class ClinicalExam(models.Model):
     جلسة فحص سريري لمريض معيّن، تشمل الشكوى والنصيحة وربط الإجراءات
     """
 
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="clinical_exams")
-    doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True)
-    appointment = models.OneToOneField(Appointment, on_delete=models.SET_NULL, null=True, blank=True, related_name='clinical_exam')
+    patient = models.ForeignKey(
+        Patient,
+        on_delete=models.CASCADE, 
+        related_name="clinical_exams"
+        )
+    doctor = models.ForeignKey(
+        Doctor, 
+        on_delete=models.SET_NULL, 
+        null=True
+        )
+    appointment = models.OneToOneField(
+        Appointment, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name='clinical_exam'
+        )
 
     complaint = models.TextField(blank=True, null=True)
     medical_advice = models.TextField(blank=True, null=True)
     
-    planned_procedures = models.ForeignKey(
-    'DentalProcedure',
-    on_delete=models.SET_NULL,
-    null=True,
-    blank=True,
-    related_name='planned_exams'
-)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         verbose_name = _("Clinical Exam")
@@ -33,9 +39,56 @@ class ClinicalExam(models.Model):
     def __str__(self):
         return f"Exam for {self.patient} on {self.created_at.date()}"
 
+class ClinicalExamItem(models.Model):
+    """سطر داخل الفحص: إجراء محدد على سن محددة"""
+    clinical_exam = models.ForeignKey(
+        ClinicalExam, on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name=_("Clinical Exam"),
+    )
+    procedure = models.ForeignKey(
+        "procedures.DentalProcedure",
+        on_delete=models.PROTECT,
+        related_name="clinical_exam_items",
+        verbose_name=_("Procedure"),
+    )
+    toothcode = models.ForeignKey(
+        "procedures.Toothcode",
+        on_delete=models.PROTECT,
+        related_name="clinical_exam_items",
+        null=True, blank=True,
+        verbose_name=_("Tooth"),
+    )
+    notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
+    performed_by = models.ForeignKey(
+        "accounts.Doctor",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="performed_exam_items",
+        verbose_name=_("Performed By"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ["-created_at"]
+        # تمنع تكرار نفس (الإجراء + السن) داخل نفس الفحص
+        constraints = [
+            models.UniqueConstraint(
+                fields=["clinical_exam", "procedure", "toothcode"],
+                name="uniq_exam_proc_tooth",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["clinical_exam"]),
+            models.Index(fields=["procedure"]),
+            models.Index(fields=["toothcode"]),
+        ]
+
+    def __str__(self):
+        tooth = getattr(self.toothcode, "code", "no-tooth")
+        return f"Exam {self.clinical_exam_id} - Proc {self.procedure_id} - {tooth}"
 # =========================
-# قاموس الإجراءات (تعريفي)
+# جدول الإجراءات الأسنان
 # =========================
 class DentalProcedure(models.Model):
     category = models.ForeignKey('ProcedureCategory', on_delete=models.SET_NULL, null=True, blank=True, related_name='procedures')
@@ -69,7 +122,7 @@ class ProcedureCategory(models.Model):
 
 
 # =========================
-# قاموس الأسنان (FDI)
+# جدول ارقام الأسنان (FDI)
 # =========================
 class Toothcode(models.Model):
     class ToothType(models.TextChoices):

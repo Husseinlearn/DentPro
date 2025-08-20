@@ -77,9 +77,9 @@ class PrescribedMedication(models.Model):
         related_name="prescriptions",
         verbose_name=_("Medication")
         )
-    times_per_day = models.PositiveIntegerField(verbose_name=_("Times Per Day"))
+    times_per_day = models.CharField(max_length=60,null=True,blank=True,verbose_name=_("Times Per Day"))
     dose_unit = models.CharField(max_length=50, verbose_name=_("Dose Unit"))
-    number_of_days = models.PositiveIntegerField(verbose_name=_("Number Of Days"))
+    number_of_days = models.CharField(max_length=60,null=True,blank=True,verbose_name=_("Number Of Days"))
     notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
 
     prescribed_by = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True, verbose_name=_("Prescribed By"))
@@ -88,10 +88,7 @@ class PrescribedMedication(models.Model):
         verbose_name = _("Prescribed Medication")
         verbose_name_plural = _("Prescribed Medications")
         ordering = ["-prescribed_at"]
-        constraints = [
-            models.CheckConstraint(check=models.Q(times_per_day__gt=0), name="pm_times_per_day_gt_0"),
-            models.CheckConstraint(check=models.Q(number_of_days__gt=0), name="pm_number_of_days_gt_0"),
-        ]
+        
 
     def __str__(self):
         return f"{self.medication.name} for {self.clinical_exam.patient}"
@@ -107,7 +104,7 @@ class MedicationPackage(models.Model):
     """
     name = models.CharField(max_length=255, verbose_name=_("Package Name"))
     disease = models.ForeignKey(
-        Disease, on_delete=models.PROTECT, related_name="medication_packages", verbose_name=_("Disease")
+        Disease, on_delete=models.PROTECT, related_name="medication_packages",null=True, verbose_name=_("Disease")
     )
     description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
     is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
@@ -136,19 +133,16 @@ class MedicationPackageItem(models.Model):
     medication = models.ForeignKey(
         Medication, on_delete=models.PROTECT, related_name="package_items", verbose_name=_("Medication")
     )
-    times_per_day = models.PositiveIntegerField(default=1, verbose_name=_("Times Per Day"))
+    times_per_day = models.CharField(max_length=60,null=True,blank=True, verbose_name=_("Times Per Day"))
     dose_unit = models.CharField(max_length=50, verbose_name=_("Dose Unit"))
-    number_of_days = models.PositiveIntegerField(default=1, verbose_name=_("Number Of Days"))
+    number_of_days = models.CharField(max_length=60,null=True,blank=True, verbose_name=_("Number Of Days"))
     notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
 
     class Meta:
         verbose_name = _("Medication Package Item")
         verbose_name_plural = _("Medication Package Items")
         unique_together = ("package", "medication")
-        constraints = [
-            models.CheckConstraint(check=models.Q(times_per_day__gt=0), name="mpi_times_per_day_gt_0"),
-            models.CheckConstraint(check=models.Q(number_of_days__gt=0), name="mpi_number_of_days_gt_0"),
-        ]
+        
 
     def __str__(self):
         return f"{self.medication} ×{self.times_per_day}/day for {self.number_of_days}d"

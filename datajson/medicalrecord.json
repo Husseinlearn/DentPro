@@ -49,5 +49,18 @@
     {
         "clinical_exam_id": 3,
         "mode": "append"
+    },
+    {
+        "clinical_exam": 6,
+        "general_notes": "يرجى شرب الماء بكثرة وتجنب القيادة عند النعاس.",
+        "items": [
+            {
+                "medication": 5,
+                "times_per_day": 3,
+                "dose_unit": "حبة",
+                "number_of_days": 7,
+                "notes": "عند الوجع"
+            }
+        ]
     }
 ]

@@ -4,7 +4,7 @@ from .views import (
     ProcedureCategoryListCreateAPIView, ProcedureCategoryRUDAPIView,
     DentalProcedureListCreateAPIView, DentalProcedureRUDAPIView,
     ToothcodeListAPIView,
-    ClinicalExamItemListCreateAPIView, ClinicalExamItemRUDAPIView,
+    ClinicalExamItemListCreateAPIView, ClinicalExamItemRUDAPIView,ProceduresByToothAPIView,
 )
 
 urlpatterns = [
@@ -21,6 +21,7 @@ urlpatterns = [
 
     # Teeth
     path("teeth/", ToothcodeListAPIView.as_view(), name="tooth-list"),
+    path("exam-items/by-tooth/", ProceduresByToothAPIView.as_view(), name="exam-items-by-tooth"),
 
     # Exam Items
     path("exam-items/", ClinicalExamItemListCreateAPIView.as_view(), name="exam-item-list-create"),

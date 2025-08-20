@@ -1,4 +1,5 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
+from django.http import Http404
 from rest_framework import generics, status, views, permissions
 from rest_framework.response import Response
 
@@ -114,3 +115,82 @@ class ClinicalExamItemRUDAPIView(generics.RetrieveUpdateDestroyAPIView):
         "clinical_exam", "procedure", "toothcode", "performed_by"
     ).all()
     serializer_class = ClinicalExamItemSerializer
+
+
+class ProceduresByToothAPIView(views.APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get_tooth(self, request):
+        """
+        يدعم:
+        - ?tooth=31&by=number  -> tooth_number='31'
+        - ?tooth=31&by=id      -> pk=31
+        - ?tooth=31            -> auto: يجرّب tooth_number أولًا ثم id
+        """
+        tooth_param = request.query_params.get("tooth")
+        if not tooth_param:
+            raise Http404("tooth is required")
+
+        mode = (request.query_params.get("by") or "auto").lower().strip()
+        s = str(tooth_param).strip()
+
+        if mode == "id":
+            if not s.isdigit():
+                raise Http404("tooth id must be numeric")
+            return get_object_or_404(Toothcode, pk=int(s))
+
+        if mode == "number":
+            return get_object_or_404(Toothcode, tooth_number__iexact=s)
+
+        # auto: جرّب رقم السن أولًا، ثم pk إن لم يوجد
+        try:
+            return Toothcode.objects.get(tooth_number__iexact=s)
+        except Toothcode.DoesNotExist:
+            pass
+        except Toothcode.MultipleObjectsReturned:
+            # إذا رقم السن غير فريد، يمكنك إجبار الاستعلام بـ by=number أو جعل tooth_number فريد
+            return get_object_or_404(Toothcode, tooth_number__iexact=s)
+
+        if s.isdigit():
+            return get_object_or_404(Toothcode, pk=int(s))
+
+        # غير رقمي ولم نجده كرقم سن (لن يصل هنا عادة)
+        return get_object_or_404(Toothcode, tooth_number__iexact=s)
+
+    def get(self, request):
+        tooth = self.get_tooth(request)
+        qs = ClinicalExamItem.objects.select_related(
+            "clinical_exam", "procedure", "procedure__category", "toothcode", "performed_by"
+        ).filter(toothcode=tooth)
+
+        exam_id = request.query_params.get("exam")
+        appt_id = request.query_params.get("appointment")
+        patient_id = request.query_params.get("patient")
+
+        if exam_id:
+            qs = qs.filter(clinical_exam_id=exam_id)
+        elif appt_id:
+            qs = qs.filter(clinical_exam__appointment_id=appt_id)
+        if patient_id:
+            qs = qs.filter(clinical_exam__patient_id=patient_id)
+
+        distinct = request.query_params.get("distinct")
+        if distinct in ("1", "true", "True"):
+            procs = (qs.values(
+                        "procedure", "procedure__name",
+                        "procedure__category", "procedure__category__name"
+                    )
+                    .order_by("procedure")
+                    .distinct())
+            return Response({
+                "tooth": {"id": tooth.id, "number": tooth.tooth_number},
+                "count": qs.count(),
+                "procedures": list(procs),
+            })
+
+        data = ClinicalExamItemSerializer(qs, many=True).data
+        return Response({
+            "tooth": {"id": tooth.id, "number": tooth.tooth_number},
+            "count": len(data),
+            "items": data,
+        })

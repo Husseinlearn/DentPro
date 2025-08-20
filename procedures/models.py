@@ -29,7 +29,7 @@ class ClinicalExam(models.Model):
 
     complaint = models.TextField(blank=True, null=True)
     medical_advice = models.TextField(blank=True, null=True)
-    
+    prescription_notes = models.TextField(blank=True, null=True, verbose_name=_("Prescription Notes"))
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         verbose_name = _("Clinical Exam")

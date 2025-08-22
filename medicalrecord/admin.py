@@ -9,13 +9,11 @@ from .models import (
     MedicationPackage,
     MedicationPackageItem,
     AppliedMedicationPackage,
+    PatientPrescriptionReport,
 )
 from appointment.models import Appointment
-
-# استيراد نماذج الإجراءات من تطبيق procedures
-# ملاحظة: لو كانت أسماء الموديلات مختلفة عندك، عدّلها هنا
-from procedures.models import Procedure, ProcedureToothcode
-
+from procedures.models import Procedure, ProcedureToothcode,ClinicalExam
+from django.db.models import Count, Max
 
 # ===========================
 # Inlines
@@ -47,8 +45,8 @@ class MedicalRecordAdmin(admin.ModelAdmin):
         "patient_diseases_list",
         "patient_allergies_list",
         "appointment_history",
-        "procedures_history",      # جديد: عرض الإجراءات المنفّذة
-        "prescriptions_history",   # جديد: عرض الوصفات المصروفة
+        "procedures_history",      
+        "prescriptions_history",   
     ]
     fields = [
         "patient",
@@ -56,8 +54,8 @@ class MedicalRecordAdmin(admin.ModelAdmin):
         "patient_diseases_list",
         "patient_allergies_list",
         "appointment_history",
-        "procedures_history",      # جديد
-        "prescriptions_history",   # جديد
+        "procedures_history",      
+        "prescriptions_history",  
         "created_at", "updated_at",
     ]
     inlines = [AttachmentInline]
@@ -345,7 +343,9 @@ class PrescribedMedicationAdmin(admin.ModelAdmin):
     ]
     list_filter = ["prescribed_by", "prescribed_at"]
     raw_id_fields = ["clinical_exam", "medication", "prescribed_by"]
-
+    # def has_module_permission(self, request):
+    #     # يمنع ظهور التطبيق في فهرس الأدمن
+    #     return False
 
 # ===========================
 # MedicationPackage (+ items)
@@ -376,3 +376,111 @@ class AppliedMedicationPackageAdmin(admin.ModelAdmin):
         "clinical_exam__patient__last_name",
     ]
     raw_id_fields = ["clinical_exam", "package", "prescribed_by"]
+
+
+class PrescribedMedicationInline(admin.TabularInline):
+    model = PrescribedMedication
+    extra = 1
+    autocomplete_fields = ["medication"]
+    fields = ["medication", "times_per_day", "dose_unit", "number_of_days", "notes", "prescribed_by", "prescribed_at"]
+    readonly_fields = ["prescribed_at"]
+
+# # @admin.register(ClinicalExam)
+# # class ClinicalExamAdmin(admin.ModelAdmin):
+# #     list_display = ["patient", "doctor", "appointment", "created_at"]
+# #     search_fields = ["patient__first_name", "patient__last_name", "doctor__user__first_name", "doctor__user__last_name"]
+# #     inlines = [PrescribedMedicationInline]
+@admin.register(PatientPrescriptionReport)
+class PatientPrescriptionReportAdmin(admin.ModelAdmin):
+    # عرض اسم المريض، عدد الأدوية المصروفة، آخر تاريخ صرف، وقائمة الأدوية
+    list_display = ["patient_name", "total_prescriptions", "last_prescribed_at", "medications_summary"]
+    search_fields = ["first_name", "last_name", "email", "phone", "address"]
+    list_per_page = 20
+
+    def get_queryset(self, request):
+        """
+        نحسّن الاستعلام بضم إحصاءات: العدد وآخر تاريخ،
+        ونقلل الاستعلامات لاحقًا.
+        """
+        qs = super().get_queryset(request)
+        # ضم aggregate على جدول PrescribedMedication عبر clinical_exam__patient
+        return qs.annotate(
+            _total=Count("clinical_exams__prescribed_medications", distinct=False),
+            _last=Max("clinical_exams__prescribed_medications__prescribed_at"),
+        )
+
+    def patient_name(self, obj):
+        return f"{obj.first_name or ''} {obj.last_name or ''}".strip() or "—"
+    patient_name.short_description = "المريض"
+
+    def total_prescriptions(self, obj):
+        # قِيمة من الـ annotate
+        return getattr(obj, "_total", 0)
+    total_prescriptions.short_description = "عدد الأدوية المصروفة"
+
+    def last_prescribed_at(self, obj):
+        val = getattr(obj, "_last", None)
+        return val or "—"
+    last_prescribed_at.short_description = "آخر صرف"
+
+    def medications_summary(self, obj):
+        items = (
+            PrescribedMedication.objects
+            .filter(clinical_exam__patient=obj)
+            .select_related("medication")
+            .order_by("-prescribed_at")
+        )
+        if not items.exists():
+            return "لا توجد أدوية مصروفة"
+
+        grouped = {}
+        for pm in items:
+            name = getattr(getattr(pm, "medication", None), "name", None) or "—"
+            entry = grouped.setdefault(name, {"count": 0, "lines": []})
+            entry["count"] += 1
+            entry["lines"].append(
+                f"{getattr(pm, 'times_per_day', '—')}×/اليوم، "
+                f"{getattr(pm, 'number_of_days', '—')} يوم، "
+                f"{getattr(pm, 'dose_unit', '—')}"
+            )
+
+        rows = []
+        for name, data in grouped.items():
+            preview = " | ".join(data["lines"][:2])
+            more = f" …(+{len(data['lines'])-2})" if len(data["lines"]) > 2 else ""
+            rows.append(
+                format_html(
+                    "💊 <b>{}</b> <small>(x{})</small><br><span>{}{}</span>",
+                    name, data["count"], preview, more
+                )
+            )
+        return format_html_join("\n", "<div style='margin-bottom:6px;'>• {}</div>", ((row,) for row in rows))
+
+    medications_summary.short_description = "ملخص الأدوية"
+
+    # (اختياري) لو تريد “عرض تفصيلي” بدل التجميع:
+    # استبدل محتوى medications_summary بما يلي:
+    #
+    # def medications_summary(self, obj):
+    #     items = (
+    #         PrescribedMedication.objects
+    #         .filter(clinical_exam__patient=obj)
+    #         .select_related("medication", "clinical_exam__appointment", "prescribed_by__user")
+    #         .order_by("-prescribed_at")
+    #     )
+    #     if not items.exists():
+    #         return "لا توجد أدوية مصروفة"
+    #     rows = []
+    #     for pm in items:
+    #         med_name = getattr(getattr(pm, "medication", None), "name", None) or "—"
+    #         appt = getattr(getattr(pm, "clinical_exam", None), "appointment", None)
+    #         appt_txt = f"{getattr(appt, 'date', '—')} {getattr(appt, 'time', '')}".strip()
+    #         row = (
+    #             f"💊 <b>{med_name}</b> — "
+    #             f"{getattr(pm, 'times_per_day', '—')}×/اليوم, {getattr(pm, 'number_of_days', '—')} يوم, "
+    #             f"{getattr(pm, 'dose_unit', '—')} — "
+    #             f"🕒 {getattr(pm, 'prescribed_at', '—')} — "
+    #             f"📅 {appt_txt}"
+    #         )
+    #         rows.append((row,))
+    #     return format_html_join("\n", "<div>• {}</div>", rows)

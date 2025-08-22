@@ -10,7 +10,7 @@ from .models import (
     MedicationPackageItem,
     AppliedMedicationPackage,
 )
-
+from django.db import transaction
 from procedures.models import ClinicalExam
 from accounts.models import Doctor
 from patients.models import Patient, PatientAllergy, PatientDisease
@@ -68,25 +68,101 @@ class PrescribedMedicationNestedSerializer(serializers.ModelSerializer):
 
 
 # (full serializer for create/update via API)
+class FlexibleMedicationField(serializers.Field):
+    """
+    يقبل:
+      - رقم (id)
+      - نص اسم الدواء
+      - كائن: {"id": 1} أو {"name": "Paracetamol"}
+    ويُرجع كائن Medication.
+    """
+    def to_internal_value(self, data):
+        # 1) {"id": ..} أو {"name": ..}
+        if isinstance(data, dict):
+            if "id" in data and data["id"]:
+                med = Medication.objects.filter(pk=data["id"]).first()
+                if not med:
+                    raise serializers.ValidationError("Medication with this id does not exist.")
+                return med
+            if "name" in data and data["name"]:
+                name = str(data["name"]).strip()
+                # ابحث بدون حساسية حالة الأحرف، أو أنشئ
+                med = Medication.objects.filter(name__iexact=name).first()
+                if med:
+                    return med
+                # أنشئ دواء جديدًا باسم فقط؛ عدّل الحقول الافتراضية حسب موديلك
+                return Medication(name=name)
+            raise serializers.ValidationError("Provide either 'id' or 'name' for medication.")
+
+        # 2) رقم (id) مباشرة
+        if isinstance(data, int) or (isinstance(data, str) and data.isdigit()):
+            med = Medication.objects.filter(pk=int(data)).first()
+            if not med:
+                raise serializers.ValidationError("Medication with this id does not exist.")
+            return med
+
+        # 3) نص اسم الدواء
+        if isinstance(data, str):
+            name = data.strip()
+            if not name:
+                raise serializers.ValidationError("Medication name is empty.")
+            med = Medication.objects.filter(name__iexact=name).first()
+            return med if med else Medication(name=name)
+
+        raise serializers.ValidationError("Invalid medication value.")
+
+    def to_representation(self, value):
+        # عرض مختصر للدواء
+        return {
+            "id": value.id,
+            "name": value.name,
+            "default_dose_unit": getattr(value, "default_dose_unit", None),
+            "is_active": getattr(value, "is_active", None),
+        }
+
+
 class PrescribedMedicationSerializer(serializers.ModelSerializer):
-    medication_name = serializers.CharField(source="medication.name", read_only=True)
+    # نستبدل FK التقليدي بحقلنا المرن
+    medication = FlexibleMedicationField()
 
     class Meta:
         model = PrescribedMedication
         fields = [
-            "id", "clinical_exam", "medication", "medication_name",
-            "times_per_day", "dose_unit", "number_of_days",
-            "notes", "prescribed_by", "prescribed_at",
+            "id",
+            "clinical_exam",    
+            "medication",
+            "times_per_day",
+            "dose_unit",
+            "number_of_days",
+            "notes",
+            "prescribed_by",
+            "prescribed_at",
         ]
         read_only_fields = ["id", "prescribed_at"]
 
-    # تعبئة الموصي تلقائياً من المستخدم إن وُجد
+    @transaction.atomic
     def create(self, validated_data):
-        request = self.context.get("request")
-        doctor = getattr(getattr(request, "user", None), "doctor", None)
-        if doctor and "prescribed_by" not in validated_data:
-            validated_data["prescribed_by"] = doctor
+        med = validated_data.pop("medication")
+        # لو المد رجع *كائن غير محفوظ* (أنشأناه للتو)، خزّنه أولاً
+        if med.pk is None:
+            # لو عندك حقول إلزامية أخرى في Medication (مثلاً default_dose_unit)
+            # عيّن قيمًا افتراضية قبل الحفظ إذا لزم
+            med.save()
+        validated_data["medication"] = med
         return super().create(validated_data)
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        med = validated_data.pop("medication", None)
+        if med is not None:
+            if med.pk is None:
+                med.save()
+            instance.medication = med
+        # حدث بقية الحقول
+        for f, v in validated_data.items():
+            setattr(instance, f, v)
+        instance.save()
+        return instance
 
 
 # -------------------------------------------------
@@ -303,10 +379,10 @@ class ApplyMedicationPackageSerializer(serializers.Serializer):
 # Create a full prescription (General notes + items)
 # =================================================
 class PrescriptionItemInputSerializer(serializers.Serializer):
-    medication = serializers.PrimaryKeyRelatedField(queryset=Medication.objects.filter(is_active=True))
-    times_per_day = serializers.IntegerField(min_value=1)
+    medication = FlexibleMedicationField()   # بدلاً من PrimaryKeyRelatedField
+    times_per_day = serializers.CharField(max_length=20)
     dose_unit = serializers.CharField(max_length=50)
-    number_of_days = serializers.IntegerField(min_value=1)
+    number_of_days = serializers.CharField(max_length=20)
     notes = serializers.CharField(allow_blank=True, required=False)
 
 class PrescriptionUpsertSerializer(serializers.Serializer):
@@ -319,9 +395,10 @@ class PrescriptionUpsertSerializer(serializers.Serializer):
             raise serializers.ValidationError("يجب إضافة دواء واحد على الأقل.")
         return attrs
 
+    @transaction.atomic
     def create(self, validated_data):
         exam = validated_data["clinical_exam"]
-        # حفظ الملاحظة العامة
+        # ملاحظة الوصفة العامة
         exam.prescription_notes = validated_data.get("general_notes") or None
         exam.save(update_fields=["prescription_notes"])
 
@@ -330,9 +407,17 @@ class PrescriptionUpsertSerializer(serializers.Serializer):
 
         created = []
         for it in validated_data["items"]:
+            med = it["medication"]   # FlexibleMedicationField يرجّع كائن Medication
+            if getattr(med, "pk", None) is None:
+                # ضع قيماً افتراضية إن لزم حسب الموديل
+                if not getattr(med, "default_dose_unit", None):
+                    med.default_dose_unit = it.get("dose_unit") or ""
+                med.is_active = True
+                med.save()   # <-- مهم جداً
+
             pm = PrescribedMedication.objects.create(
                 clinical_exam=exam,
-                medication=it["medication"],
+                medication=med,
                 times_per_day=it["times_per_day"],
                 dose_unit=it["dose_unit"],
                 number_of_days=it["number_of_days"],
@@ -341,7 +426,7 @@ class PrescriptionUpsertSerializer(serializers.Serializer):
             )
             created.append(pm)
 
-        # رجّع تمثيل غني يحتوي نفس المدخلات + أسماء الأدوية وتواريخ الإنشاء
+        # تمثيل الإرجاع
         items_repr = []
         for pm in created:
             items_repr.append({

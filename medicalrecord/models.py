@@ -188,3 +188,10 @@ class AppliedMedicationPackage(models.Model):
 
     def __str__(self):
         return f"Applied {self.package} to exam #{self.clinical_exam_id} ({self.mode})"
+    
+
+class PatientPrescriptionReport(Patient):
+    class Meta:
+        proxy = True
+        verbose_name = "تقرير وصفات المريض"
+        verbose_name_plural = "تقارير وصفات المرضى"

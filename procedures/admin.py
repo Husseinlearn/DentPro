@@ -5,6 +5,7 @@ from .models import (
     ClinicalExam, ProcedureCategory, DentalProcedure,
     Toothcode, Procedure, ProcedureToothcode
 )
+# from medicalrecord.admin import PrescribedMedicationInline
 # Register your models here.
 
 
@@ -40,6 +41,7 @@ class ClinicalExamAdmin(admin.ModelAdmin):
     list_display = ["patient", "doctor", "appointment", "created_at"]
     search_fields = ["patient__first_name", "patient__last_name", "doctor__first_name", "doctor__last_name"]
     autocomplete_fields = ["patient", "doctor", "appointment"]
+    # inlines = [PrescribedMedicationInline]
 
 @admin.register(ProcedureCategory)
 class ProcedureCategoryAdmin(admin.ModelAdmin):

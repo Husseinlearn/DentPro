@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from django.db.models.functions import Lower
 from .models import (Patient , Disease, Medication, PatientDisease, PatientAllergy) 
-from datetime import datetime, date
-
+from datetime import datetime, date, timedelta
+from django.db.models import Q
+from django.utils.timezone import localdate, now as tznow
+from appointment.models import Appointment
 import re
 
 class FlexibleDateField(serializers.DateField):
@@ -24,6 +26,12 @@ class FlexibleItemsField(serializers.ListField):
     def __init__(self, **kwargs):
         super().__init__(child=serializers.JSONField(), **kwargs)
 
+class AppointmentInlineSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = ["id", "date", "time", "status", "doctor", "doctor_name"]
 # --------------------------------------------------------------------
 # Patient Serializer: تسجيل المريض والتحقق من بياناته
 # --------------------------------------------------------------------
@@ -31,7 +39,7 @@ class PatientSerializer(serializers.ModelSerializer):
     date_of_birth = FlexibleDateField()
     diseases = FlexibleItemsField(write_only=True, required=False)
     allergies = FlexibleItemsField(write_only=True, required=False)
-
+    closest_appointment = serializers.SerializerMethodField(read_only=True)
     chronic_diseases = serializers.SerializerMethodField(read_only=True)
     medication_allergies = serializers.SerializerMethodField(read_only=True)
 
@@ -53,6 +61,7 @@ class PatientSerializer(serializers.ModelSerializer):
             'allergies',            # write-only
             'chronic_diseases',     # read-only
             'medication_allergies', 
+            'closest_appointment',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     # 1- التحقق من الاسم الكامل
@@ -228,6 +237,36 @@ class PatientSerializer(serializers.ModelSerializer):
             self._set_patient_allergies(instance, allergies_items)
 
         return instance
+    
+    def get_closest_appointment(self, obj):
+        """
+        يُرجع أقرب موعد قادم للمريض؛ وإن لم يوجد، يُرجع أحدث موعد مضى؛
+        وإن لم يوجد أي موعد يُرجع None.
+        """
+        today = localdate()
+        now_time = tznow().time()
+
+        # أقرب موعد قادم (اليوم لاحقًا أو في الأيام القادمة)
+        upcoming = (Appointment.objects
+                    .filter(patient=obj)
+                    .filter(Q(date__gt=today) | Q(date=today, time__gte=now_time))
+                    .order_by("date", "time")
+                    .first())
+
+        if upcoming:
+            return AppointmentInlineSerializer(upcoming).data
+
+        # أحدث موعد مضى (اليوم قبل الآن أو أيام سابقة)
+        latest_past = (Appointment.objects
+                       .filter(patient=obj)
+                       .filter(Q(date__lt=today) | Q(date=today, time__lt=now_time))
+                       .order_by("-date", "-time")
+                       .first())
+
+        if latest_past:
+            return AppointmentInlineSerializer(latest_past).data
+
+        return None
     
     # -------------------------
     # للعرض فقط

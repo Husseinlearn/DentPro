@@ -11,6 +11,8 @@ from .models import (
 )
 from accounts.models import Doctor
 from appointment.models import Appointment
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 
 # =====================================================================
@@ -107,7 +109,7 @@ class FlexiblePKOrSlugRelatedField(serializers.Field):
 class ProcedureCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProcedureCategory
-        fields = ["id", "name", "description, ", "created_at"]
+        fields = ["id", "name", "description", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def validate_name(self, value):
@@ -197,10 +199,6 @@ class ClinicalExamSerializer(serializers.ModelSerializer):
 # Submit-all-in-one Serializer (يعتمد على appointment)
 # =====================================================================
 class ClinicalExamSubmitSerializer(serializers.Serializer):
-    """
-    عند الضغط على "حفظ": ننشئ/نحدّث الفحص المرتبط بالموعد،
-    ثم ننشئ سطور العناصر (إجراء × سن) دفعة واحدة.
-    """
     appointment = serializers.PrimaryKeyRelatedField(queryset=Appointment.objects.all())
 
     # حقول الفحص
@@ -208,18 +206,16 @@ class ClinicalExamSubmitSerializer(serializers.Serializer):
     medical_advice = serializers.CharField(allow_blank=True, required=False)
 
     # إجراءات متعددة + أسنان متعددة
-    # تقبل IDs مباشرة. لو تحب السماح بالأسماء استخدم FlexiblePKOrSlugRelatedField(many=True)
     procedures = serializers.PrimaryKeyRelatedField(
         queryset=DentalProcedure.objects.filter(is_active=True), many=True
     )
     teeth = serializers.PrimaryKeyRelatedField(queryset=Toothcode.objects.all(), many=True, required=False)
-    # أو أرسل أرقام الأسنان بدلاً من IDs:
     tooth_numbers = serializers.ListField(child=serializers.CharField(), required=False)
 
     # خيارات إضافية
     notes = serializers.CharField(allow_blank=True, required=False)
     performed_by = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False, allow_null=True)
-    replace_items = serializers.BooleanField(required=False, default=True)  # استبدال العناصر السابقة
+    replace_items = serializers.BooleanField(required=False, default=True)
 
     def validate(self, data):
         if not data.get("procedures"):
@@ -283,17 +279,27 @@ class ClinicalExamSubmitSerializer(serializers.Serializer):
                 )
                 for p in procs for t in teeth
             ]
-            created_items = ClinicalExamItem.objects.bulk_create(rows, ignore_conflicts=True)
+            ClinicalExamItem.objects.bulk_create(rows, ignore_conflicts=True)
 
-        # نعيد exam + العناصر
-        return {"exam": exam, "items": created_items}
+        # مهم: أعِد جلب exam مع العناصر الجديدة
+        exam = (
+            ClinicalExam.objects
+            .select_related("patient", "doctor", "appointment", "doctor__user")
+            .prefetch_related(
+                "items",
+                "items__procedure",
+                "items__procedure__category",
+                "items__toothcode"
+            )
+            .get(pk=exam.pk)
+        )
+        # نُعيد exam فقط (بدون items خارجية)
+        return exam
 
     def to_representation(self, instance):
-        exam = instance["exam"]
-        items = instance["items"]
+        # instance هنا هو ClinicalExam
         return {
-            "exam": ClinicalExamSerializer(exam).data,
-            "items": ClinicalExamItemSerializer(items, many=True).data,
+            "exam": ClinicalExamSerializer(instance).data
         }
 
 

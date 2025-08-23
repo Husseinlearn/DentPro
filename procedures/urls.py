@@ -4,7 +4,7 @@ from .views import (
     ProcedureCategoryListCreateAPIView, ProcedureCategoryRUDAPIView,
     DentalProcedureListCreateAPIView, DentalProcedureRUDAPIView,
     ToothcodeListAPIView,
-    ClinicalExamItemListCreateAPIView, ClinicalExamItemRUDAPIView,ProceduresByToothAPIView,
+    ClinicalExamItemListCreateAPIView, ClinicalExamItemRUDAPIView,ProceduresByToothAPIView,ResolveExamByAppointment
 )
 
 urlpatterns = [
@@ -12,6 +12,7 @@ urlpatterns = [
     path("clinical-exams/", ClinicalExamListCreateAPIView.as_view(), name="exam-list-create"),
     path("clinical-exams/<int:pk>/", ClinicalExamRUDAPIView.as_view(), name="exam-rud"),
     path("clinical-exams/submit/", ClinicalExamSubmitAPIView.as_view(), name="clinical-exams-submit"),
+    path("clinical-exams/resolve/", ResolveExamByAppointment.as_view(), name="exam-resolve"),
 
     # Dictionaries
     path("categories/", ProcedureCategoryListCreateAPIView.as_view(), name="category-list-create"),

@@ -3,7 +3,7 @@ from . models import ClinicalExam
 from django.contrib import admin
 from .models import (
     ClinicalExam, ProcedureCategory, DentalProcedure,
-    Toothcode, Procedure, ProcedureToothcode
+    Toothcode, Procedure, ProcedureToothcode,ClinicalExamItem
 )
 # from medicalrecord.admin import PrescribedMedicationInline
 # Register your models here.
@@ -67,3 +67,9 @@ class ProcedureToothcodeAdmin(admin.ModelAdmin):
     list_filter = ["performed_by"]
     search_fields = ["procedure__name", "toothcode__tooth_number"]
     autocomplete_fields = ["procedure", "toothcode", "performed_by"]
+@admin.register(ClinicalExamItem)
+class ClinicalExamItemAdmin(admin.ModelAdmin):
+    list_display = ["clinical_exam", "procedure", "toothcode", "performed_by", "created_at"]
+    list_filter = ["performed_by", "procedure"]
+    search_fields = ["clinical_exam__patient__first_name", "clinical_exam__patient__last_name", "procedure__name", "toothcode__tooth_number"]
+    autocomplete_fields = ["clinical_exam", "procedure", "toothcode", "performed_by"]

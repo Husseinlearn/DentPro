@@ -2,6 +2,8 @@ from django.shortcuts import render, get_object_or_404
 from django.http import Http404
 from rest_framework import generics, status, views, permissions
 from rest_framework.response import Response
+from appointment.models import Appointment
+from rest_framework.views import APIView
 
 from .models import (
     ClinicalExam,
@@ -194,3 +196,16 @@ class ProceduresByToothAPIView(views.APIView):
             "count": len(data),
             "items": data,
         })
+    
+class ResolveExamByAppointment(APIView):
+    def get(self, request):
+        appt_id = request.query_params.get("appointment")
+        if not appt_id:
+            return Response({"detail": "appointment مطلوب"}, status=400)
+
+        appt = Appointment.objects.select_related("patient","doctor").get(pk=appt_id)
+        exam, _ = ClinicalExam.objects.get_or_create(
+            appointment=appt,
+            defaults={"patient": appt.patient, "doctor": appt.doctor}
+        )
+        return Response({"clinical_exam": exam.id}, status=200)

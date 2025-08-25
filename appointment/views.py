@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, permissions
+from rest_framework.views import APIView
 from .models import Appointment
 from .serializers import AppointmentSerializer, AppointmentStatusUpdateSerializer
 from datetime import date
@@ -52,3 +53,19 @@ class AppointmentStatusUpdateAPIView(generics.UpdateAPIView):
             "appointment_id": str(appointment.id),
             "new_status": serializer.data['status']
         }, status=status.HTTP_200_OK)
+
+class LastAppointmentByPatientAPIView(APIView):
+    """
+    جلب أخر موعد عبر id الريض 
+    """
+    def get(self, request, patient_id):
+        last_appt = (
+            Appointment.objects
+            .filter(patient_id=patient_id)
+            .select_related('patient', 'doctor__user')
+            .order_by('-date', '-time', '-created_at')
+            .first()
+        )
+        if not last_appt:
+            return Response({"detail": "لا يوجد مواعيد لهذا المريض."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(AppointmentSerializer(last_appt).data, status=status.HTTP_200_OK)

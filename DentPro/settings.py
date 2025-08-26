@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 from datetime import timedelta
 from decouple import config  # For environment variable management
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -33,6 +34,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    # 'unfold',
     'corsheaders',  # CORS headers
     'django.contrib.admin',
     'django.contrib.auth',
@@ -49,7 +51,20 @@ INSTALLED_APPS = [
     'appointment',  # Custom app for appointment management
     'procedures',  # Custom app for procedures management
     'medicalrecord',  # Custom app for medical records management
+    'core',
+    'billing',
+    # 'django_extensions',
 ]
+UNFOLD = {
+    "THEME": "dark",# "light" أو "system"
+    "SITE_TITLE": "DentPro Admin",
+    "SITE_HEADER": "DentPro",
+    "SITE_SUBHEADER": "Smart Dental Management",
+    "SITE_URL": "/admin/",
+    # لو تريد CSS مخصص (مثلاً RTL) أضفه هنا:
+    # "STYLES": ["/static/admin/custom-rtl.css"],
+}
+
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
@@ -163,8 +178,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# 'unfold', # 'simpleui', #'adminlte3',

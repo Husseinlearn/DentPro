@@ -25,6 +25,8 @@ urlpatterns = [
     path('api/appointment/', include('appointment.urls')),  # Include URLs from the appointment app
     path('api/procedures/', include('procedures.urls')),  # Include URLs from the procedures app
     path('api/medical-record/', include('medicalrecord.urls')),  # Include URLs from the medicalrecord app
+    path('api/billing/', include('billing.urls')),  # Include URLs from the billing app
+    path('api/core/',include('core.urls')),  # Include URLs from the core app
     path('api-auth/', include('rest_framework.urls')),  # Include DRF authentication URLs
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # JWT token endpoint
 ]

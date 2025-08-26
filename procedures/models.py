@@ -10,6 +10,10 @@ class ClinicalExam(models.Model):
     جلسة فحص سريري لمريض معيّن، تشمل الشكوى والنصيحة وربط الإجراءات
     """
 
+    # def get():
+    #     temp=ClinicalExam.objects.get(pk=1)
+        
+
     patient = models.ForeignKey(
         Patient,
         on_delete=models.CASCADE, 

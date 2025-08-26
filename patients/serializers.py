@@ -64,6 +64,36 @@ class PatientSerializer(serializers.ModelSerializer):
             'closest_appointment',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    def get_closest_appointment(self, obj):
+        """
+        يُرجع أقرب موعد قادم للمريض؛ وإن لم يوجد، يُرجع أحدث موعد مضى؛
+        وإن لم يوجد أي موعد يُرجع None.
+        """
+        today = localdate()
+        now_time = tznow().time()
+
+        # أقرب موعد قادم (اليوم لاحقًا أو في الأيام القادمة)
+        upcoming = (Appointment.objects
+                    .filter(patient=obj)
+                    .filter(Q(date__gt=today) | Q(date=today, time__gte=now_time))
+                    .order_by("date", "time")
+                    .first())
+
+        if upcoming:
+            return AppointmentInlineSerializer(upcoming).data
+
+        # أحدث موعد مضى (اليوم قبل الآن أو أيام سابقة)
+        latest_past = (
+            Appointment.objects
+            .filter(patient=obj)
+            .filter(Q(date__lt=today) | Q(date=today, time__lt=now_time))
+            .order_by("-date", "-time")
+            .first())
+
+        if latest_past:
+            return AppointmentInlineSerializer(latest_past).data
+
+        return None
     # 1- التحقق من الاسم الكامل
     def validate(self, data):
         full_name = f"{data.get('first_name', '').strip()} {data.get('last_name', '').strip()}"
@@ -238,35 +268,6 @@ class PatientSerializer(serializers.ModelSerializer):
 
         return instance
     
-    def get_closest_appointment(self, obj):
-        """
-        يُرجع أقرب موعد قادم للمريض؛ وإن لم يوجد، يُرجع أحدث موعد مضى؛
-        وإن لم يوجد أي موعد يُرجع None.
-        """
-        today = localdate()
-        now_time = tznow().time()
-
-        # أقرب موعد قادم (اليوم لاحقًا أو في الأيام القادمة)
-        upcoming = (Appointment.objects
-                    .filter(patient=obj)
-                    .filter(Q(date__gt=today) | Q(date=today, time__gte=now_time))
-                    .order_by("date", "time")
-                    .first())
-
-        if upcoming:
-            return AppointmentInlineSerializer(upcoming).data
-
-        # أحدث موعد مضى (اليوم قبل الآن أو أيام سابقة)
-        latest_past = (Appointment.objects
-                       .filter(patient=obj)
-                       .filter(Q(date__lt=today) | Q(date=today, time__lt=now_time))
-                       .order_by("-date", "-time")
-                       .first())
-
-        if latest_past:
-            return AppointmentInlineSerializer(latest_past).data
-
-        return None
     
     # -------------------------
     # للعرض فقط

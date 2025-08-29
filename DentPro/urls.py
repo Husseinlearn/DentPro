@@ -16,9 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse 
 from rest_framework_simplejwt.views import TokenObtainPairView
-
+def health(_): return HttpResponse("ok")
 urlpatterns = [
+    path('health', health),
     path('admin/', admin.site.urls),
     path('api/accounts/', include('accounts.urls')),  # Include URLs from the accounts app
     path('api/patients/', include('patients.urls')),  # Include URLs from the patients app
